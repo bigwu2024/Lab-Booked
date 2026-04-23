@@ -588,6 +588,27 @@
             gap: 1rem;
         }
         textarea.form-control { resize: vertical; min-height: 60px; }
+
+        /* 密码可见性切换 */
+        .password-wrapper {
+            position: relative;
+        }
+        .password-wrapper .form-control {
+            padding-right: 42px;
+        }
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            user-select: none;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .password-toggle:hover { opacity: 1; }
         .form-hint {
             font-size: 0.78rem;
             color: var(--text-secondary);
@@ -1229,8 +1250,11 @@
                 </div>
                 <div class="form-group">
                     <label>密码</label>
-                    <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码"
-                           onkeydown="if(event.key==='Enter')doLogin()">
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码"
+                               onkeydown="if(event.key==='Enter')doLogin()">
+                        <span class="password-toggle" onclick="togglePassword('loginPassword', this)">👁</span>
+                    </div>
                 </div>
                 <button class="login-btn" onclick="doLogin()">登 录</button>
                 <div class="login-switch">
@@ -1254,7 +1278,10 @@
                 </div>
                 <div class="form-group">
                     <label>密码 *</label>
-                    <input type="password" id="regPassword" class="form-control" placeholder="至少4位">
+                    <div class="password-wrapper">
+                        <input type="password" id="regPassword" class="form-control" placeholder="至少4位">
+                        <span class="password-toggle" onclick="togglePassword('regPassword', this)">👁</span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>课题组</label>
@@ -1460,7 +1487,10 @@
                     </div>
                     <div class="form-group">
                         <label>SMTP 密码 / 授权码 *</label>
-                        <input type="password" id="smtpPass" class="form-control" placeholder="邮箱SMTP授权码">
+                        <div class="password-wrapper">
+                            <input type="password" id="smtpPass" class="form-control" placeholder="邮箱SMTP授权码">
+                            <span class="password-toggle" onclick="togglePassword('smtpPass', this)">👁</span>
+                        </div>
                         <div class="form-hint">QQ邮箱需在设置中开启SMTP并获取授权码；网易邮箱使用客户端授权码</div>
                     </div>
                     <div class="form-group">
@@ -1740,15 +1770,24 @@
         <div class="modal-body">
             <div class="form-group">
                 <label>原密码 *</label>
-                <input type="password" id="oldPassword" class="form-control" placeholder="请输入当前密码">
+                <div class="password-wrapper">
+                    <input type="password" id="oldPassword" class="form-control" placeholder="请输入当前密码">
+                    <span class="password-toggle" onclick="togglePassword('oldPassword', this)">👁</span>
+                </div>
             </div>
             <div class="form-group">
                 <label>新密码 *</label>
-                <input type="password" id="newPassword" class="form-control" placeholder="至少4位">
+                <div class="password-wrapper">
+                    <input type="password" id="newPassword" class="form-control" placeholder="至少4位">
+                    <span class="password-toggle" onclick="togglePassword('newPassword', this)">👁</span>
+                </div>
             </div>
             <div class="form-group">
                 <label>确认新密码 *</label>
-                <input type="password" id="confirmPassword" class="form-control" placeholder="再次输入新密码">
+                <div class="password-wrapper">
+                    <input type="password" id="confirmPassword" class="form-control" placeholder="再次输入新密码">
+                    <span class="password-toggle" onclick="togglePassword('confirmPassword', this)">👁</span>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -1760,6 +1799,18 @@
 
 <!-- ==================== JavaScript ==================== -->
 <script>
+// ==================== 密码可见性切换 ====================
+function togglePassword(inputId, icon) {
+    const input = document.getElementById(inputId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = '🔒';
+    } else {
+        input.type = 'password';
+        icon.textContent = '👁';
+    }
+}
+
 // ==================== 全局状态 ====================
 const API = '';
 let currentUser = null;
