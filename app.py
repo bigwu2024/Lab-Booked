@@ -949,13 +949,20 @@ def index():
 # ==================== 启动 ====================
 
 # 初始化数据库（gunicorn 通过 import 启动，不会走 __main__，所以放在模块级别）
+def _delayed_init():
+    """延迟初始化数据库，最多重试5次"""
+    import time
+    for i in range(5):
+        try:
+            init_db()
+            print(f"[启动] 数据库初始化成功（第{i+1}次尝试）")
+            return
+        except Exception as e:
+            print(f"[启动] 数据库初始化失败（第{i+1}次）: {e}")
+            time.sleep(3)
+
 if DATABASE_URL:
-    try:
-        init_db()
-        print("[启动] 数据库初始化成功")
-    except Exception as e:
-        print(f"[启动] 数据库初始化失败（将在首次请求时重试）: {e}")
-        _db_initialized = False
+    _delayed_init()
 
 # 启动邮件提醒后台线程
 t = threading.Thread(target=reminder_loop, daemon=True)
