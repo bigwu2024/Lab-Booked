@@ -1,0 +1,2606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>实验室超净台预约系统</title>
+    <style>
+        /* ==================== 基础重置与变量 ==================== */
+        :root {
+            --primary: #4f6ef7;
+            --primary-light: #6b85f9;
+            --primary-dark: #3a54d4;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --text: #1a1a2e;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+                         'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* ==================== 登录页 ==================== */
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem;
+        }
+        .login-card {
+            display: flex;
+            background: var(--card);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 900px;
+            width: 100%;
+            min-height: 520px;
+        }
+        .login-left {
+            flex: 1;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            padding: 3rem 2.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-left::before {
+            content: '';
+            position: absolute;
+            top: -50%; right: -50%;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
+        }
+        .login-left::after {
+            content: '';
+            position: absolute;
+            bottom: -30%; left: -30%;
+            width: 80%; height: 80%;
+            background: rgba(255,255,255,0.03);
+            border-radius: 50%;
+        }
+        .login-left h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            position: relative;
+            z-index: 1;
+        }
+        .login-left p {
+            font-size: 1rem;
+            opacity: 0.85;
+            position: relative;
+            z-index: 1;
+            line-height: 1.8;
+        }
+        .login-left .features {
+            margin-top: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+        .login-left .features li {
+            list-style: none;
+            padding: 0.4rem 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .login-left .features li::before {
+            content: '✓ ';
+            font-weight: 700;
+        }
+        .login-right {
+            flex: 1;
+            padding: 3rem 2.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .login-right h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .login-right .subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+        .login-form .form-group { margin-bottom: 1.1rem; }
+        .login-form .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .login-form .form-control {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        .login-form .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79,110,247,0.15);
+        }
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            margin-top: 0.5rem;
+        }
+        .login-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(79,110,247,0.4);
+        }
+        .login-btn:active { transform: translateY(0); }
+        .login-switch {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .login-switch a {
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .login-switch a:hover { text-decoration: underline; }
+        .login-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: var(--danger);
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        .register-form { display: none; }
+
+        /* ==================== 顶部导航 ==================== */
+        .navbar {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 0 2rem;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(79,110,247,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+        .navbar h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .nav-tab {
+            padding: 8px 20px;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.85);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .nav-tab:hover { background: rgba(255,255,255,0.15); color: white; }
+        .nav-tab.active { background: white; color: var(--primary); box-shadow: var(--shadow); }
+
+        /* 用户菜单 */
+        .user-menu {
+            position: relative;
+        }
+        .user-trigger {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 10px;
+            transition: background 0.2s;
+        }
+        .user-trigger:hover { background: rgba(255,255,255,0.15); }
+        .user-avatar {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .user-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            min-width: 200px;
+            padding: 8px 0;
+            display: none;
+            z-index: 200;
+        }
+        .user-dropdown.show { display: block; }
+        .user-dropdown .dd-item {
+            padding: 10px 18px;
+            font-size: 0.9rem;
+            color: var(--text);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.15s;
+        }
+        .user-dropdown .dd-item:hover { background: var(--bg); }
+        .user-dropdown .dd-item.danger { color: var(--danger); }
+        .user-dropdown .dd-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 6px 0;
+        }
+        .user-dropdown .dd-info {
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 4px;
+        }
+        .user-dropdown .dd-info .dd-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .user-dropdown .dd-info .dd-email {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+        }
+
+        /* ==================== 主内容区 ==================== */
+        .main-app { display: none; }
+        .main-app.active { display: block; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* ==================== 统计卡片 ==================== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stat-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        .stat-icon.blue { background: #eff6ff; color: var(--primary); }
+        .stat-icon.green { background: #f0fdf4; color: var(--success); }
+        .stat-icon.orange { background: #fffbeb; color: var(--warning); }
+        .stat-icon.purple { background: #faf5ff; color: #8b5cf6; }
+        .stat-info h3 { font-size: 1.5rem; font-weight: 700; }
+        .stat-info p { font-size: 0.85rem; color: var(--text-secondary); }
+
+        /* ==================== 周视图日历 ==================== */
+        .calendar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            background: var(--card);
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .calendar-nav h2 { font-size: 1.1rem; min-width: 200px; text-align: center; }
+        .btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--card);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .btn-primary:hover { background: var(--primary-dark); color: white; }
+        .btn-danger { color: var(--danger); border-color: var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+
+        /* 日历网格 */
+        .calendar-wrapper {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow-x: auto;
+        }
+        .calendar-grid {
+            display: flex;
+            min-width: fit-content;
+        }
+        .time-gutter {
+            width: 60px;
+            flex-shrink: 0;
+            border-right: 2px solid var(--border);
+            position: sticky;
+            left: 0;
+            z-index: 6;
+            background: var(--card);
+        }
+        .time-gutter-header {
+            height: 48px;
+            border-bottom: 2px solid var(--border);
+        }
+        .time-gutter-row {
+            height: 60px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            border-bottom: 1px solid var(--border);
+            line-height: 1;
+        }
+        .day-col {
+            flex: 1;
+            min-width: 120px;
+            border-right: 1px solid var(--border);
+            position: relative;
+        }
+        .day-col:last-child { border-right: none; }
+        .day-col-header {
+            height: 48px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border-bottom: 2px solid var(--border);
+            background: #fafbfc;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .day-col-header.today {
+            background: var(--primary);
+            color: white;
+        }
+        .day-col-header .day-name { font-size: 0.7rem; opacity: 0.7; }
+        .day-col-body {
+            position: relative;
+        }
+        .hour-row {
+            height: 60px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .hour-row:hover { background: rgba(79,110,247,0.04); }
+        .hour-row:last-child { border-bottom: none; }
+
+        /* 预约块 */
+        .booking-block {
+            position: absolute;
+            border-radius: 6px;
+            padding: 4px 6px;
+            font-size: 0.72rem;
+            overflow: hidden;
+            cursor: pointer;
+            z-index: 3;
+            transition: transform 0.15s, box-shadow 0.15s;
+            border-left: 3px solid;
+        }
+        .booking-block:hover {
+            transform: scale(1.03);
+            box-shadow: var(--shadow-lg);
+            z-index: 10;
+        }
+        .booking-block .b-user { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .booking-block .b-time { opacity: 0.8; font-size: 0.65rem; }
+        .booking-block .b-purpose { opacity: 0.7; font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .booking-block.eq-1 { background: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+        .booking-block.eq-2 { background: #dcfce7; border-color: #22c55e; color: #166534; }
+        .booking-block.eq-3 { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+        .booking-block.eq-4 { background: #f3e8ff; border-color: #a855f7; color: #6b21a8; }
+        .booking-block.eq-5 { background: #fce7f3; border-color: #ec4899; color: #9d174d; }
+
+        /* ==================== 模态框 ==================== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: var(--card);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            width: 90%;
+            max-width: 520px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalIn 0.25s ease;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .modal-header {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .modal-header h2 { font-size: 1.1rem; }
+        .modal-close {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            border: none;
+            background: var(--bg);
+            cursor: pointer;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .modal-close:hover { background: #e5e7eb; }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+
+        /* ==================== 表单 ==================== */
+        .form-group { margin-bottom: 1rem; }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .form-control {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79,110,247,0.15);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        textarea.form-control { resize: vertical; min-height: 60px; }
+        .form-hint {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* ==================== 表格 ==================== */
+        .table-wrapper {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .table-toolbar {
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        .table-toolbar h2 { font-size: 1.1rem; }
+        table { width: 100%; border-collapse: collapse; }
+
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        th {
+            background: #fafbfc;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        tr:hover { background: #f8fafc; }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-active { background: #dcfce7; color: #166534; }
+        .badge-cancelled { background: #fee2e2; color: #991b1b; }
+        .badge-available { background: #dcfce7; color: #166534; }
+        .badge-maintenance { background: #fef3c7; color: #92400e; }
+        .badge-offline { background: #f3f4f6; color: #6b7280; }
+        .badge-admin { background: #ede9fe; color: #5b21b6; }
+        .actions { display: flex; gap: 6px; }
+
+        /* ==================== Toast 通知 ==================== */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            background: var(--card);
+            box-shadow: var(--shadow-lg);
+            font-size: 0.9rem;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-left: 4px solid;
+            max-width: 360px;
+        }
+        .toast.success { border-color: var(--success); }
+        .toast.error { border-color: var(--danger); }
+        .toast.warning { border-color: var(--warning); }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(100px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(100px); } }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+        .empty-state svg { margin-bottom: 1rem; opacity: 0.4; }
+        .empty-state p { font-size: 0.95rem; }
+
+        /* ==================== 使用趋势图 ==================== */
+        .chart-container {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .chart-container h3 { font-size: 1rem; margin-bottom: 1rem; }
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            height: 120px;
+            padding-top: 10px;
+        }
+        .bar-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .bar {
+            width: 100%;
+            max-width: 50px;
+            background: linear-gradient(180deg, var(--primary-light), var(--primary));
+            border-radius: 6px 6px 2px 2px;
+            transition: height 0.5s ease;
+            min-height: 2px;
+        }
+        .bar-label { font-size: 0.7rem; color: var(--text-secondary); }
+        .bar-value { font-size: 0.7rem; font-weight: 600; color: var(--primary); }
+
+        /* ==================== 设备卡片 ==================== */
+        .equipment-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .eq-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            box-shadow: var(--shadow);
+            border-top: 4px solid var(--primary);
+            transition: transform 0.2s;
+        }
+        .eq-card:hover { transform: translateY(-2px); }
+        .eq-card.maintenance { border-top-color: var(--warning); }
+        .eq-card.offline { border-top-color: #9ca3af; }
+        .eq-card h3 { font-size: 1.05rem; margin-bottom: 0.25rem; }
+        .eq-card .eq-location { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+        .eq-card .eq-desc { font-size: 0.8rem; color: var(--text-secondary); }
+
+        /* ==================== 搜索过滤 ==================== */
+        .search-box { position: relative; }
+        .search-box input {
+            padding: 8px 14px 8px 36px;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            width: 240px;
+            transition: border-color 0.2s;
+        }
+        .search-box input:focus { outline: none; border-color: var(--primary); }
+        .search-box svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+
+        /* ==================== 邮件设置页 ==================== */
+        .email-settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .settings-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+        }
+        .settings-card h3 {
+            font-size: 1.05rem;
+            margin-bottom: 0.25rem;
+        }
+        .settings-card .card-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+        }
+        .email-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 0.85rem;
+            margin-bottom: 1.25rem;
+        }
+        .email-status.configured { background: #f0fdf4; color: #166534; }
+        .email-status.not-configured { background: #fef3c7; color: #92400e; }
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            cursor: pointer;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #d1d5db;
+            border-radius: 12px;
+            transition: background 0.2s;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px; height: 18px;
+            left: 3px; top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .toggle input:checked + .toggle-slider { background: var(--primary); }
+        .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+
+
+        /* ==================== 移动端底部导航 ==================== */
+
+        .mobile-nav {
+
+            display: none;
+
+            position: fixed;
+
+            bottom: 0;
+
+            left: 0;
+
+            right: 0;
+
+            background: white;
+
+            border-top: 1px solid var(--border);
+
+            z-index: 300;
+
+            padding: 6px 0 env(safe-area-inset-bottom, 6px);
+
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+
+        }
+
+        .mobile-nav-items {
+
+            display: flex;
+
+            justify-content: space-around;
+
+            align-items: center;
+
+        }
+
+        .mobile-nav-item {
+
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            gap: 2px;
+
+            padding: 6px 4px;
+
+            border: none;
+
+            background: none;
+
+            color: var(--text-secondary);
+
+            font-size: 0.65rem;
+
+            cursor: pointer;
+
+            -webkit-tap-highlight-color: transparent;
+
+            transition: color 0.15s;
+
+            min-width: 0;
+
+            flex: 1;
+
+        }
+
+        .mobile-nav-item.active { color: var(--primary); }
+
+        .mobile-nav-item .m-icon { font-size: 1.25rem; line-height: 1; }
+
+        .mobile-nav-item .m-label {
+
+            white-space: nowrap;
+
+            overflow: hidden;
+
+            text-overflow: ellipsis;
+
+            max-width: 60px;
+
+        }
+
+
+
+        /* ==================== 全面响应式 ==================== */
+
+
+
+        /* --- 平板 (<=1024px) --- */
+
+        @media (max-width: 1024px) {
+
+            .nav-tab { padding: 7px 14px; font-size: 0.82rem; }
+
+            .day-col { min-width: 100px; }
+
+        }
+
+
+
+        /* --- 大手机/小平板 (<=768px) --- */
+
+        @media (max-width: 768px) {
+
+            .navbar {
+
+                height: 56px;
+
+                padding: 0 1rem;
+
+            }
+
+            .navbar .nav-tabs { display: none; }
+
+            .mobile-nav { display: block; }
+
+            .main-app.active { padding-bottom: 75px; }
+
+
+
+            .container { padding: 0.75rem; }
+
+
+
+            .login-card {
+
+                flex-direction: column;
+
+                max-width: 420px;
+
+                min-height: auto;
+
+            }
+
+            .login-left {
+
+                padding: 1.5rem;
+
+                min-height: auto;
+
+            }
+
+            .login-left h1 { font-size: 1.3rem; }
+
+            .login-left .features { display: none; }
+
+            .login-right { padding: 1.5rem; }
+
+
+
+            .stats-grid {
+
+                grid-template-columns: repeat(2, 1fr);
+
+                gap: 0.6rem;
+
+                margin-bottom: 1rem;
+
+            }
+
+            .stat-card {
+
+                padding: 0.9rem;
+
+                gap: 0.7rem;
+
+            }
+
+            .stat-icon { width: 40px; height: 40px; font-size: 1.2rem; border-radius: 10px; }
+
+            .stat-info h3 { font-size: 1.2rem; }
+
+            .stat-info p { font-size: 0.75rem; }
+
+
+
+            .calendar-header {
+
+                padding: 0.75rem;
+
+                gap: 0.5rem;
+
+            }
+
+            .calendar-nav { width: 100%; justify-content: space-between; }
+
+            .calendar-nav h2 { font-size: 0.9rem; min-width: auto; flex: 1; text-align: center; }
+
+            .calendar-nav .btn { padding: 6px 10px; font-size: 0.8rem; }
+
+            .calendar-header .btn-primary { width: 100%; order: -1; }
+
+
+
+            .time-gutter { width: 45px; }
+
+            .time-gutter-row { font-size: 0.65rem; padding-right: 4px; }
+
+            .day-col { min-width: 80px; }
+
+            .day-col-header { font-size: 0.75rem; }
+
+            .day-col-header .day-name { font-size: 0.6rem; }
+
+            .booking-block { font-size: 0.6rem; padding: 2px 4px; border-left-width: 2px; }
+
+            .booking-block .b-user { font-size: 0.6rem; }
+
+            .booking-block .b-time { font-size: 0.55rem; }
+
+            .booking-block .b-purpose { display: none; }
+
+
+
+            .form-row { grid-template-columns: 1fr; }
+
+
+
+            .modal { width: 95%; max-height: 85vh; border-radius: 12px; }
+
+            .modal-header { padding: 1rem; }
+
+            .modal-body { padding: 1rem; }
+
+            .modal-footer { padding: 0.75rem 1rem; flex-wrap: wrap; }
+
+            .modal-footer .btn { flex: 1; min-width: 100px; justify-content: center; }
+
+
+
+            .table-toolbar {
+
+                padding: 0.75rem;
+
+                flex-direction: column;
+
+                align-items: stretch;
+
+            }
+
+            .table-toolbar h2 { font-size: 1rem; }
+
+            th, td { padding: 8px 10px; font-size: 0.8rem; }
+
+
+
+            .email-settings { grid-template-columns: 1fr; }
+
+
+
+            .user-dropdown {
+
+                position: fixed;
+
+                top: auto;
+
+                bottom: 0;
+
+                left: 0;
+
+                right: 0;
+
+                border-radius: 16px 16px 0 0;
+
+                max-width: 100%;
+
+                animation: slideUp 0.25s ease;
+
+            }
+
+            .user-dropdown.show { display: block; }
+
+            @keyframes slideUp {
+
+                from { transform: translateY(100%); }
+
+                to { transform: translateY(0); }
+
+            }
+
+        }
+
+
+
+        /* --- 手机 (<=480px) --- */
+
+        @media (max-width: 480px) {
+
+            .login-left { display: none; }
+
+            .login-right { padding: 1.5rem 1.25rem; }
+
+            .login-card { border-radius: 16px; }
+
+
+
+            .navbar { height: 50px; padding: 0 0.75rem; }
+
+            .navbar h1 { font-size: 1rem; gap: 6px; }
+
+            .navbar h1 svg { width: 20px; height: 20px; }
+
+            .user-name { display: none; }
+
+
+
+            .container { padding: 0.6rem; }
+
+
+
+            .stats-grid { gap: 0.5rem; }
+
+            .stat-card { padding: 0.7rem; border-radius: 10px; gap: 0.5rem; }
+
+            .stat-icon { width: 36px; height: 36px; font-size: 1rem; }
+
+            .stat-info h3 { font-size: 1.1rem; }
+
+            .stat-info p { font-size: 0.7rem; }
+
+
+
+            .time-gutter { width: 38px; }
+
+            .time-gutter-row { font-size: 0.6rem; }
+
+            .day-col { min-width: 60px; }
+
+            .day-col-header { font-size: 0.65rem; height: 42px; }
+
+            .day-col-header .day-name { font-size: 0.55rem; }
+
+
+
+            .btn { padding: 7px 12px; font-size: 0.8rem; }
+
+            .btn-sm { padding: 5px 8px; font-size: 0.72rem; }
+
+
+
+            .toast-container { right: 10px; left: 10px; top: 60px; }
+
+            .toast { max-width: 100%; font-size: 0.82rem; }
+
+
+
+            .bar-chart { height: 80px; }
+
+            .bar-label { font-size: 0.55rem; }
+
+            .bar-value { font-size: 0.55rem; }
+
+        }
+
+
+
+        /* --- 超小屏 (<=360px) --- */
+
+        @media (max-width: 360px) {
+
+            .stats-grid { gap: 0.4rem; }
+
+            .stat-card { padding: 0.6rem; flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+
+            .stat-icon { width: 30px; height: 30px; font-size: 0.85rem; }
+
+            .stat-info h3 { font-size: 1rem; }
+
+            .day-col { min-width: 50px; }
+
+            .day-col-header { font-size: 0.6rem; }
+
+        }
+
+
+    </style>
+</head>
+<body>
+
+<!-- ==================== 登录页 ==================== -->
+<div class="login-page" id="loginPage">
+    <div class="login-card">
+        <div class="login-left">
+            <h1>🔬 超净台预约系统</h1>
+            <p>实验室设备预约管理平台</p>
+            <ul class="features">
+                <li>可视化周视图日历，一目了然</li>
+                <li>实时冲突检测，避免时间重叠</li>
+                <li>预约邮件提醒，不错过使用时间</li>
+                <li>多设备管理，灵活分配资源</li>
+            </ul>
+        </div>
+        <div class="login-right">
+            <h2 id="authTitle">欢迎登录</h2>
+            <p class="subtitle" id="authSubtitle">请输入你的账号信息</p>
+
+            <div class="login-error" id="loginError"></div>
+
+            <!-- 登录表单 -->
+            <div class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="loginEmail" class="form-control" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码"
+                           onkeydown="if(event.key==='Enter')doLogin()">
+                </div>
+                <button class="login-btn" onclick="doLogin()">登 录</button>
+                <div class="login-switch">
+                    还没有账号？<a onclick="showRegister()">立即注册</a>
+                </div>
+            </div>
+
+            <!-- 注册表单 -->
+            <div class="login-form register-form" id="registerForm">
+                <div class="form-group">
+                    <label>真实姓名</label>
+                    <input type="text" id="regRealName" class="form-control" placeholder="用于预约显示，实验室其他人可见">
+                </div>
+                <div class="form-group">
+                    <label>昵称 *</label>
+                    <input type="text" id="regName" class="form-control" placeholder="请输入昵称（不必真实姓名）">
+                </div>
+                <div class="form-group">
+                    <label>邮箱 *</label>
+                    <input type="email" id="regEmail" class="form-control" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码 *</label>
+                    <input type="password" id="regPassword" class="form-control" placeholder="至少4位">
+                </div>
+                <div class="form-group">
+                    <label>课题组</label>
+                    <input type="text" id="regGroup" class="form-control" placeholder="如：张教授课题组">
+                </div>
+                <div class="form-group">
+                    <label>联系电话</label>
+                    <input type="text" id="regPhone" class="form-control" placeholder="手机号">
+                </div>
+                <button class="login-btn" onclick="doRegister()">注 册</button>
+                <div class="login-switch">
+                    已有账号？<a onclick="showLogin()">返回登录</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 主应用 ==================== -->
+<div class="main-app" id="mainApp">
+
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <h1>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0-4h18"/>
+                </svg>
+                超净台预约
+            </h1>
+            <div class="nav-tabs" id="navTabs">
+                <button class="nav-tab active" data-page="calendar" onclick="switchPage('calendar')">📅 预约日历</button>
+                <button class="nav-tab" data-page="bookings" onclick="switchPage('bookings')">📋 预约记录</button>
+                <button class="nav-tab" data-page="equipment" onclick="switchPage('equipment')">🔬 设备管理</button>
+                <button class="nav-tab" data-page="users" onclick="switchPage('users')">👥 用户管理</button>
+                <button class="nav-tab" data-page="email" onclick="switchPage('email')">📧 邮件设置</button>
+            </div>
+        </div>
+        <div class="user-menu">
+            <div class="user-trigger" onclick="toggleUserMenu()">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <span class="user-name" id="navUserName">用户</span>
+            </div>
+            <div class="user-dropdown" id="userDropdown">
+                <div class="dd-info">
+                    <div class="dd-name" id="ddName">用户</div>
+                    <div class="dd-email" id="ddEmail">user@example.com</div>
+                </div>
+                <div class="dd-item" onclick="openProfileModal()">👤 个人设置</div>
+                <div class="dd-item" onclick="openPasswordModal()">🔑 修改密码</div>
+                <div class="dd-divider"></div>
+                <div class="dd-item danger" onclick="doLogout()">🚪 退出登录</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- 主内容 -->
+    <div class="container">
+
+        <!-- ====== 日历页 ====== -->
+        <div id="page-calendar" class="page active">
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-icon blue">📅</div>
+                    <div class="stat-info"><h3 id="statTotal">-</h3><p>活跃预约</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">✅</div>
+                    <div class="stat-info"><h3 id="statToday">-</h3><p>今日预约</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange">🔬</div>
+                    <div class="stat-info"><h3 id="statEquip">-</h3><p>设备数量</p></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple">👥</div>
+                    <div class="stat-info"><h3 id="statUsers">-</h3><p>注册用户</p></div>
+                </div>
+            </div>
+            <div class="calendar-header">
+                <div class="calendar-nav">
+                    <button class="btn" onclick="changeWeek(-1)">◀ 上一周</button>
+                    <h2 id="weekTitle">-</h2>
+                    <button class="btn" onclick="changeWeek(1)">下一周 ▶</button>
+                    <button class="btn" onclick="goToday()">今天</button>
+                </div>
+                <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
+            </div>
+            <div class="calendar-wrapper">
+                <div class="calendar-grid" id="calendarGrid"></div>
+            </div>
+            <div class="chart-container">
+                <h3>📊 近7天预约趋势</h3>
+                <div class="bar-chart" id="weekChart"></div>
+            </div>
+        </div>
+
+        <!-- ====== 预约记录页 ====== -->
+        <div id="page-bookings" class="page">
+            <div class="table-wrapper">
+                <div class="table-toolbar">
+                    <h2>📋 预约记录</h2>
+                    <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                        <select id="filterEquipment" class="form-control" style="width:auto;" onchange="loadBookings()">
+                            <option value="">全部设备</option>
+                        </select>
+                        <select id="filterStatus" class="form-control" style="width:auto;" onchange="loadBookings()">
+                            <option value="">全部状态</option>
+                            <option value="active">活跃</option>
+                            <option value="cancelled">已取消</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>时间</th>
+                            <th>设备</th>
+                            <th>预约人</th>
+                            <th>课题组</th>
+                            <th>用途</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookingsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ====== 设备管理页 ====== -->
+        <div id="page-equipment" class="page">
+            <div class="table-wrapper">
+                <div class="table-toolbar">
+                    <h2>🔬 设备管理</h2>
+                    <button class="btn btn-primary" onclick="openEquipmentModal()">＋ 添加设备</button>
+                </div>
+                <div class="equipment-cards" id="equipmentCards"></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>名称</th>
+                            <th>位置</th>
+                            <th>状态</th>
+                            <th>描述</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="equipmentTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ====== 用户管理页 ====== -->
+        <div id="page-users" class="page">
+            <div class="table-wrapper">
+                <div class="table-toolbar">
+                    <h2>👥 用户管理</h2>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>姓名</th>
+                            <th>邮箱</th>
+                            <th>课题组</th>
+                            <th>电话</th>
+                            <th>角色</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ====== 邮件设置页 ====== -->
+        <div id="page-email" class="page">
+            <div class="email-settings">
+                <div class="settings-card">
+                    <h3>📨 SMTP 邮件配置</h3>
+                    <p class="card-desc">配置后，系统将在预约创建、取消、即将开始时自动发送邮件提醒</p>
+                    <div class="email-status not-configured" id="emailStatus">
+                        <span>⚠️</span> 邮件服务未配置
+                    </div>
+                    <div class="form-group">
+                        <label>SMTP 服务器 *</label>
+                        <input type="text" id="smtpHost" class="form-control" placeholder="如：smtp.qq.com">
+                    </div>
+                    <div class="form-group">
+                        <label>SMTP 端口</label>
+                        <input type="number" id="smtpPort" class="form-control" value="465">
+                    </div>
+                    <div class="form-group">
+                        <label>发件邮箱 *</label>
+                        <input type="email" id="smtpUser" class="form-control" placeholder="如：lab@qq.com">
+                    </div>
+                    <div class="form-group">
+                        <label>SMTP 密码 / 授权码 *</label>
+                        <input type="password" id="smtpPass" class="form-control" placeholder="邮箱SMTP授权码">
+                        <div class="form-hint">QQ邮箱需在设置中开启SMTP并获取授权码；网易邮箱使用客户端授权码</div>
+                    </div>
+                    <div class="form-group">
+                        <label>发件人名称</label>
+                        <input type="text" id="senderName" class="form-control" value="超净台预约系统">
+                    </div>
+                    <div class="form-group">
+                        <label>使用 SSL</label>
+                        <div class="toggle-wrapper">
+                            <label class="toggle">
+                                <input type="checkbox" id="useSSL" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span style="font-size:0.85rem;color:var(--text-secondary)">SSL加密传输（推荐，端口465）</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveEmailConfig()" style="width:100%;justify-content:center;">
+                        💾 保存配置
+                    </button>
+                </div>
+                <div class="settings-card">
+                    <h3>🧪 测试邮件</h3>
+                    <p class="card-desc">保存配置后，发送一封测试邮件验证是否正常</p>
+                    <div class="form-group">
+                        <label>收件邮箱 *</label>
+                        <input type="email" id="testEmail" class="form-control" placeholder="输入接收测试邮件的邮箱">
+                    </div>
+                    <button class="btn btn-primary" onclick="sendTestEmail()" style="width:100%;justify-content:center;">
+                        📤 发送测试邮件
+                    </button>
+
+                    <div style="margin-top:2rem; padding:1rem; background:var(--bg); border-radius:var(--radius-sm);">
+                        <h4 style="font-size:0.9rem; margin-bottom:0.5rem;">📬 邮件提醒说明</h4>
+                        <ul style="font-size:0.82rem; color:var(--text-secondary); padding-left:1.2rem; line-height:1.8;">
+                            <li><strong>预约创建</strong> — 用户创建预约后立即收到确认邮件</li>
+                            <li><strong>预约取消</strong> — 预约被取消后收到通知邮件</li>
+                            <li><strong>即将开始</strong> — 预约开始前 15 分钟自动发送提醒</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-top:1rem; padding:1rem; background:#eff6ff; border-radius:var(--radius-sm);">
+                        <h4 style="font-size:0.9rem; margin-bottom:0.5rem; color:var(--primary);">💡 常用邮箱SMTP配置</h4>
+                        <div style="font-size:0.78rem; color:var(--text-secondary); line-height:1.8;">
+                            <div><strong>QQ邮箱：</strong>smtp.qq.com:465 (SSL)</div>
+                            <div><strong>网易163：</strong>smtp.163.com:465 (SSL)</div>
+                            <div><strong>网易126：</strong>smtp.126.com:465 (SSL)</div>
+                            <div><strong>Gmail：</strong>smtp.gmail.com:587 (STARTTLS)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ==================== 预约模态框 ==================== -->
+
+
+    <!-- 移动端底部导航 -->
+
+    <div class="mobile-nav" id="mobileNav">
+
+        <div class="mobile-nav-items">
+
+            <button class="mobile-nav-item active" data-page="calendar" onclick="switchPage('calendar')">
+
+                <span class="m-icon">📅</span>
+
+                <span class="m-label">预约日历</span>
+
+            </button>
+
+            <button class="mobile-nav-item" data-page="bookings" onclick="switchPage('bookings')">
+
+                <span class="m-icon">📋</span>
+
+                <span class="m-label">预约记录</span>
+
+            </button>
+
+            <button class="mobile-nav-item" data-page="equipment" onclick="switchPage('equipment')">
+
+                <span class="m-icon">🔬</span>
+
+                <span class="m-label">设备</span>
+
+            </button>
+
+            <button class="mobile-nav-item" data-page="users" onclick="switchPage('users')">
+
+                <span class="m-icon">👥</span>
+
+                <span class="m-label">用户</span>
+
+            </button>
+
+            <button class="mobile-nav-item" onclick="toggleUserMenu()">
+
+                <span class="m-icon">⚙️</span>
+
+                <span class="m-label">更多</span>
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+
+<div class="modal-overlay" id="bookingModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="bookingModalTitle">新建预约</h2>
+            <button class="modal-close" onclick="closeModal('bookingModal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="bookingId">
+            <div class="form-group" id="bookingUserGroup" style="display:none">
+                <label>预约人</label>
+                <div id="bookingUserInfo" style="padding:8px 12px;background:var(--bg-secondary);border-radius:8px;color:var(--text-secondary);font-size:0.9rem;"></div>
+            </div>
+            <div class="form-group">
+                <label>设备 *</label>
+                <select id="bookingEquipment" class="form-control" required>
+                    <option value="">请选择设备</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>日期 *</label>
+                <input type="date" id="bookingDate" class="form-control" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>开始时间 *</label>
+                    <input type="time" id="bookingStart" class="form-control" value="09:00" required>
+                </div>
+                <div class="form-group">
+                    <label>结束时间 *</label>
+                    <input type="time" id="bookingEnd" class="form-control" value="10:00" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>用途说明</label>
+                <textarea id="bookingPurpose" class="form-control" placeholder="如：细胞传代、RNA提取等"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('bookingModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveBooking()">确认预约</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 设备模态框 ==================== -->
+<div class="modal-overlay" id="equipmentModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="equipmentModalTitle">添加设备</h2>
+            <button class="modal-close" onclick="closeModal('equipmentModal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="equipmentId">
+            <div class="form-group">
+                <label>设备名称 *</label>
+                <input type="text" id="equipName" class="form-control" placeholder="如：超净台 4号">
+            </div>
+            <div class="form-group">
+                <label>位置</label>
+                <input type="text" id="equipLocation" class="form-control" placeholder="如：实验室 B201">
+            </div>
+            <div class="form-group">
+                <label>状态</label>
+                <select id="equipStatus" class="form-control">
+                    <option value="available">可用</option>
+                    <option value="maintenance">维护中</option>
+                    <option value="offline">已停用</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <input type="text" id="equipDesc" class="form-control" placeholder="设备描述信息">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('equipmentModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveEquipment()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 用户模态框（管理员） ==================== -->
+<div class="modal-overlay" id="userModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="userModalTitle">编辑用户</h2>
+            <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="userId">
+            <div class="form-group">
+                <label>昵称 *</label>
+                <input type="text" id="userName" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>真实姓名</label>
+                <input type="text" id="userRealName" class="form-control" placeholder="用于预约显示，实验室其他人可见">
+            </div>
+            <div class="form-group">
+                <label>课题组</label>
+                <input type="text" id="userGroup" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" id="userPhone" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>角色</label>
+                <select id="userRole" class="form-control">
+                    <option value="user">普通用户</option>
+                    <option value="admin">管理员</option>
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('userModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveUser()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 个人设置模态框 ==================== -->
+<div class="modal-overlay" id="profileModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>👤 个人设置</h2>
+            <button class="modal-close" onclick="closeModal('profileModal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>邮箱（不可修改）</label>
+                <input type="email" id="profileEmail" class="form-control" disabled style="background:#f8fafc;">
+            </div>
+            <div class="form-group">
+                <label>昵称</label>
+                <input type="text" id="profileName" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>真实姓名</label>
+                <input type="text" id="profileRealName" class="form-control" placeholder="用于预约显示，实验室其他人可见">
+            </div>
+            <div class="form-group">
+                <label>课题组</label>
+                <input type="text" id="profileGroup" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>联系电话</label>
+                <input type="text" id="profilePhone" class="form-control">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('profileModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveProfile()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 修改密码模态框 ==================== -->
+<div class="modal-overlay" id="passwordModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>🔑 修改密码</h2>
+            <button class="modal-close" onclick="closeModal('passwordModal')">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>原密码 *</label>
+                <input type="password" id="oldPassword" class="form-control" placeholder="请输入当前密码">
+            </div>
+            <div class="form-group">
+                <label>新密码 *</label>
+                <input type="password" id="newPassword" class="form-control" placeholder="至少4位">
+            </div>
+            <div class="form-group">
+                <label>确认新密码 *</label>
+                <input type="password" id="confirmPassword" class="form-control" placeholder="再次输入新密码">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeModal('passwordModal')">取消</button>
+            <button class="btn btn-primary" onclick="changePassword()">确认修改</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== JavaScript ==================== -->
+<script>
+// ==================== 全局状态 ====================
+const API = '';
+let currentUser = null;
+let currentWeekStart = getMonday(new Date());
+let equipmentList = [];
+let userList = [];
+
+// ==================== 工具函数 ====================
+function getMonday(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    date.setDate(diff);
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
+
+function formatDate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function formatDateShort(dateStr) {
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatDateChinese(dateStr) {
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+function isAdmin() {
+    return currentUser && currentUser.role === 'admin';
+}
+
+// ==================== API 请求 ====================
+async function api(url, options = {}) {
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = localStorage.getItem('authToken');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const res = await fetch(API + url, {
+            headers,
+            ...options,
+            body: options.body ? JSON.stringify(options.body) : undefined,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            showToast(data.error || '请求失败', 'error');
+            return null;
+        }
+        return data;
+    } catch (e) {
+        showToast('网络错误，请检查后端是否启动', 'error');
+        console.error(e);
+        return null;
+    }
+}
+
+function showToast(msg, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    const icons = { success: '✅', error: '❌', warning: '⚠️' };
+    toast.innerHTML = `<span>${icons[type] || ''}</span> ${msg}`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('show');
+}
+
+// ==================== 登录 / 注册 ====================
+function showLogin() {
+    document.getElementById('loginForm').style.display = 'block';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('authTitle').textContent = '欢迎登录';
+    document.getElementById('authSubtitle').textContent = '请输入你的账号信息';
+    document.getElementById('loginError').style.display = 'none';
+}
+
+function showRegister() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'block';
+    document.getElementById('authTitle').textContent = '注册账号';
+    document.getElementById('authSubtitle').textContent = '填写信息创建新账号';
+    document.getElementById('loginError').style.display = 'none';
+}
+
+function showLoginError(msg) {
+    const el = document.getElementById('loginError');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    if (!email || !password) {
+        showLoginError('请输入邮箱和密码');
+        return;
+    }
+
+    const data = await api('/api/auth/login', {
+        method: 'POST',
+        body: { email, password }
+    });
+
+    if (data) {
+        currentUser = data.user;
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        enterApp();
+    } else {
+        showLoginError('邮箱或密码错误');
+    }
+}
+
+async function doRegister() {
+    const real_name = document.getElementById('regRealName').value.trim();
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const group_name = document.getElementById('regGroup').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+
+    if (!name) { showLoginError('请输入昵称'); return; }
+    if (!email) { showLoginError('请输入邮箱'); return; }
+    if (!password || password.length < 4) { showLoginError('密码至少4位'); return; }
+
+    const data = await api('/api/auth/register', {
+        method: 'POST',
+        body: { name, real_name, email, password, group_name, phone }
+    });
+
+    if (data) {
+        showToast('注册成功，已自动登录！');
+        currentUser = data.user;
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        enterApp();
+    } else {
+        showLoginError('注册失败，可能邮箱已被注册');
+    }
+}
+
+function doLogout() {
+    currentUser = null;
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('currentUser');
+    document.getElementById('userDropdown').classList.remove('show');
+    document.getElementById('mainApp').classList.remove('active');
+    document.getElementById('loginPage').style.display = 'flex';
+    // 清空表单
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    showLogin();
+}
+
+// ==================== 进入应用 ====================
+function enterApp() {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainApp').classList.add('active');
+    updateUserUI();
+    updateNavTabs();
+    loadCalendar();
+}
+
+function updateUserUI() {
+    if (!currentUser) return;
+    const name = currentUser.name || '用户';
+    document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+    document.getElementById('navUserName').textContent = name;
+    document.getElementById('ddName').textContent = name;
+    document.getElementById('ddEmail').textContent = currentUser.email || '';
+}
+
+function updateNavTabs() {
+    const tabs = document.querySelectorAll('#navTabs .nav-tab');
+    tabs.forEach(tab => {
+        const page = tab.dataset.page;
+        if (page === 'users' || page === 'equipment') {
+            tab.style.display = isAdmin() ? '' : 'none';
+        }
+        if (page === 'email') {
+            tab.style.display = isAdmin() ? '' : 'none';
+        }
+    });
+}
+
+// ==================== 用户菜单 ====================
+function toggleUserMenu() {
+    document.getElementById('userDropdown').classList.toggle('show');
+}
+
+// 点击外部关闭菜单
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('userDropdown');
+    const trigger = document.querySelector('.user-trigger');
+    if (menu && trigger && !trigger.contains(e.target) && !menu.contains(e.target)) {
+        menu.classList.remove('show');
+    }
+});
+
+// ==================== 个人设置 ====================
+function openProfileModal() {
+    document.getElementById('userDropdown').classList.remove('show');
+    if (!currentUser) return;
+    document.getElementById('profileEmail').value = currentUser.email || '';
+    document.getElementById('profileName').value = currentUser.name || '';
+    document.getElementById('profileRealName').value = currentUser.real_name || '';
+    document.getElementById('profileGroup').value = currentUser.group_name || '';
+    document.getElementById('profilePhone').value = currentUser.phone || '';
+    document.getElementById('profileModal').classList.add('show');
+}
+
+async function saveProfile() {
+    const payload = {
+        id: currentUser.id,
+        name: document.getElementById('profileName').value.trim(),
+        real_name: document.getElementById('profileRealName').value.trim(),
+        group_name: document.getElementById('profileGroup').value.trim(),
+        phone: document.getElementById('profilePhone').value.trim(),
+    };
+    if (!payload.name) { showToast('请输入昵称', 'warning'); return; }
+
+    const data = await api('/api/auth/profile', { method: 'PUT', body: payload });
+    if (data) {
+        currentUser = data.user;
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        updateUserUI();
+        showToast('个人信息更新成功');
+        closeModal('profileModal');
+    }
+}
+
+// ==================== 修改密码 ====================
+function openPasswordModal() {
+    document.getElementById('userDropdown').classList.remove('show');
+    document.getElementById('oldPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('passwordModal').classList.add('show');
+}
+
+async function changePassword() {
+    const old_password = document.getElementById('oldPassword').value;
+    const new_password = document.getElementById('newPassword').value;
+    const confirm = document.getElementById('confirmPassword').value;
+
+    if (!old_password || !new_password || !confirm) {
+        showToast('请填写所有字段', 'warning'); return;
+    }
+    if (new_password.length < 4) {
+        showToast('新密码至少4位', 'warning'); return;
+    }
+    if (new_password !== confirm) {
+        showToast('两次输入的新密码不一致', 'warning'); return;
+    }
+
+    const data = await api('/api/auth/password', {
+        method: 'PUT',
+        body: { id: currentUser.id, old_password, new_password }
+    });
+    if (data) {
+        showToast('密码修改成功');
+        closeModal('passwordModal');
+    }
+}
+
+// ==================== 邮件设置 ====================
+async function loadEmailConfig() {
+    const data = await api('/api/email-config');
+    if (!data) return;
+    const statusEl = document.getElementById('emailStatus');
+    if (data.configured) {
+        statusEl.className = 'email-status configured';
+        statusEl.innerHTML = '<span>✅</span> 邮件服务已配置';
+        document.getElementById('smtpHost').value = data.smtp_host || '';
+        document.getElementById('smtpPort').value = data.smtp_port || 465;
+        document.getElementById('smtpUser').value = data.smtp_user || '';
+        document.getElementById('senderName').value = data.sender_name || '超净台预约系统';
+        document.getElementById('useSSL').checked = data.use_ssl !== false;
+    } else {
+        statusEl.className = 'email-status not-configured';
+        statusEl.innerHTML = '<span>⚠️</span> 邮件服务未配置';
+    }
+}
+
+async function saveEmailConfig() {
+    const config = {
+        smtp_host: document.getElementById('smtpHost').value.trim(),
+        smtp_port: parseInt(document.getElementById('smtpPort').value) || 465,
+        smtp_user: document.getElementById('smtpUser').value.trim(),
+        smtp_pass: document.getElementById('smtpPass').value,
+        sender_name: document.getElementById('senderName').value.trim() || '超净台预约系统',
+        use_ssl: document.getElementById('useSSL').checked,
+    };
+    if (!config.smtp_host || !config.smtp_user) {
+        showToast('请填写SMTP服务器和发件邮箱', 'warning'); return;
+    }
+    const data = await api('/api/email-config', { method: 'POST', body: config });
+    if (data) {
+        showToast('邮件配置保存成功');
+        loadEmailConfig();
+    }
+}
+
+async function sendTestEmail() {
+    const to = document.getElementById('testEmail').value.trim();
+    if (!to) { showToast('请输入收件邮箱', 'warning'); return; }
+    const data = await api('/api/email-test', { method: 'POST', body: { to_email: to } });
+    if (data) {
+        showToast('测试邮件已发送，请查收');
+    }
+}
+
+// ==================== 页面切换 ====================
+function switchPage(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(`page-${page}`).classList.add('active');
+    const tab = document.querySelector(`.nav-tab[data-page="${page}"]`);
+    if (tab) tab.classList.add('active');
+
+    if (page === 'calendar') loadCalendar();
+    if (page === 'bookings') loadBookings();
+    if (page === 'equipment') loadEquipment();
+    if (page === 'users') loadUsers();
+    if (page === 'email') loadEmailConfig();
+}
+
+// ==================== 日历 ====================
+function changeWeek(offset) {
+    currentWeekStart.setDate(currentWeekStart.getDate() + offset * 7);
+    loadCalendar();
+}
+
+function goToday() {
+    currentWeekStart = getMonday(new Date());
+    loadCalendar();
+}
+
+async function loadCalendar() {
+    const dateStr = formatDate(currentWeekStart);
+    const data = await api(`/api/bookings/week?date=${dateStr}`);
+    if (!data) return;
+
+    const endDate = new Date(currentWeekStart);
+    endDate.setDate(endDate.getDate() + 6);
+    document.getElementById('weekTitle').textContent =
+        `${formatDateChinese(dateStr)} - ${formatDateChinese(formatDate(endDate))}`;
+
+    const grid = document.getElementById('calendarGrid');
+    const today = formatDate(new Date());
+    const START_HOUR = 7, END_HOUR = 22;
+    const HOUR_HEIGHT = 60;
+    const TOTAL_HOURS = END_HOUR - START_HOUR;
+
+    let html = '';
+
+    // 时间标签列
+    html += '<div class="time-gutter">';
+    html += '<div class="time-gutter-header"></div>';
+    for (let h = START_HOUR; h < END_HOUR; h++) {
+        html += `<div class="time-gutter-row">${String(h).padStart(2, '0')}:00</div>`;
+    }
+    html += '</div>';
+
+    // 7个日期列
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(currentWeekStart);
+        d.setDate(d.getDate() + i);
+        const ds = formatDate(d);
+        const isToday = ds === today;
+        // 普通用户只看自己的预约
+        let dayBookings = data.bookings.filter(b => b.date === ds);
+        if (!isAdmin()) {
+            dayBookings = dayBookings.filter(b => b.user_id === currentUser.id);
+        }
+
+        html += `<div class="day-col">`;
+        html += `<div class="day-col-header ${isToday ? 'today' : ''}">
+            <div class="day-name">${DAY_NAMES[i]}</div>
+            <div>${d.getDate()}</div>
+        </div>`;
+
+        html += `<div class="day-col-body" style="height:${TOTAL_HOURS * HOUR_HEIGHT}px; position:relative;">`;
+
+        // 背景小时行
+        for (let h = START_HOUR; h < END_HOUR; h++) {
+            const slot = `${String(h).padStart(2, '0')}:00`;
+            html += `<div class="hour-row" onclick="openBookingModal(null, '${ds}', '${slot}')"></div>`;
+        }
+
+        // 预约块
+        const sorted = [...dayBookings].sort((a, b) =>
+            timeToMinutes(a.start_time) - timeToMinutes(b.start_time) ||
+            timeToMinutes(b.end_time) - timeToMinutes(a.end_time)
+        );
+        const colEnds = [];
+        const colAssign = [];
+        for (const b of sorted) {
+            const bStart = timeToMinutes(b.start_time);
+            const bEnd = timeToMinutes(b.end_time);
+            let col = -1;
+            for (let c = 0; c < colEnds.length; c++) {
+                if (colEnds[c] <= bStart) { col = c; break; }
+            }
+            if (col === -1) { col = colEnds.length; colEnds.push(0); }
+            colEnds[col] = bEnd;
+            colAssign.push(col);
+        }
+        const totalCols = Math.max(colEnds.length, 1);
+
+        for (let bi = 0; bi < sorted.length; bi++) {
+            const b = sorted[bi];
+            const eqIdx = (b.equipment_id - 1) % 5 + 1;
+            const startMin = timeToMinutes(b.start_time) - START_HOUR * 60;
+            const endMin = timeToMinutes(b.end_time) - START_HOUR * 60;
+            const top = startMin * (HOUR_HEIGHT / 60);
+            const height = (endMin - startMin) * (HOUR_HEIGHT / 60);
+            const displayHeight = Math.max(height, 24);
+            const col = colAssign[bi];
+            const gap = totalCols > 1 ? 1 : 2;
+            const innerWidth = 100 - gap * 2;
+            const colWidth = innerWidth / totalCols;
+            const left = gap + col * colWidth;
+
+            html += `<div class="booking-block eq-${eqIdx}"
+                style="top:${top}px; height:${displayHeight}px; position:absolute; left:${left}%; width:${colWidth}%;"
+                onclick="event.stopPropagation(); viewBooking(${b.id})"
+                title="${b.user_name} | ${b.equipment_name} | ${b.start_time}-${b.end_time}">
+                <div class="b-user">${b.user_name} · ${b.equipment_name}</div>
+                <div class="b-time">${b.start_time}-${b.end_time}</div>
+                ${displayHeight > 40 ? `<div class="b-purpose">${b.purpose || ''}</div>` : ''}
+            </div>`;
+        }
+
+        html += '</div></div>';
+    }
+
+    grid.innerHTML = html;
+    loadStats();
+}
+
+function timeToMinutes(t) {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+}
+
+async function loadStats() {
+    const stats = await api('/api/stats');
+    if (!stats) return;
+    document.getElementById('statTotal').textContent = stats.total_bookings;
+    document.getElementById('statToday').textContent = stats.today_bookings;
+    document.getElementById('statEquip').textContent = stats.total_equipment;
+    document.getElementById('statUsers').textContent = stats.total_users;
+
+    const chart = document.getElementById('weekChart');
+    const maxCount = Math.max(...stats.week_stats.map(s => s.count), 1);
+    chart.innerHTML = stats.week_stats.map(s => {
+        const height = (s.count / maxCount) * 100;
+        const d = new Date(s.date);
+        const label = `${d.getMonth() + 1}/${d.getDate()}`;
+        return `<div class="bar-item">
+            <div class="bar-value">${s.count}</div>
+            <div class="bar" style="height:${Math.max(height, 4)}px"></div>
+            <div class="bar-label">${label}</div>
+        </div>`;
+    }).join('');
+}
+
+// ==================== 预约 CRUD ====================
+async function loadBookings() {
+    let url = '/api/bookings?';
+    const equipFilter = document.getElementById('filterEquipment').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+    if (equipFilter) url += `equipment_id=${equipFilter}&`;
+    if (statusFilter) url += `status=${statusFilter}`;
+
+    const data = await api(url);
+    if (!data) return;
+
+    // 普通用户只看自己的预约
+    const filtered = isAdmin() ? data : data.filter(b => b.user_id === currentUser.id);
+
+    const tbody = document.getElementById('bookingsTableBody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">暂无预约记录</div></td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(b => {
+        const isOwner = currentUser && b.user_id === currentUser.id;
+        const canEdit = isAdmin() || isOwner;
+        return `<tr>
+            <td>${b.date}</td>
+            <td>${b.start_time} - ${b.end_time}</td>
+            <td>${b.equipment_name}</td>
+            <td><strong>${b.user_name}</strong></td>
+            <td>${b.group_name || '-'}</td>
+            <td>${b.purpose || '-'}</td>
+            <td><span class="badge badge-${b.status}">${b.status === 'active' ? '活跃' : '已取消'}</span></td>
+            <td class="actions">
+                ${b.status === 'active' && canEdit ? `
+                    <button class="btn btn-sm" onclick="editBooking(${b.id})">编辑</button>
+                    <button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">取消</button>
+                ` : '<span style="color:#9ca3af">-</span>'}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function openBookingModal(bookingId = null, preDate = null, preTime = null) {
+    await Promise.all([loadEquipmentOptions(), isAdmin() ? loadUserOptions() : Promise.resolve()]);
+
+    document.getElementById('bookingModalTitle').textContent = bookingId ? '编辑预约' : '新建预约';
+    document.getElementById('bookingId').value = bookingId || '';
+    document.getElementById('bookingDate').value = preDate || formatDate(new Date());
+    document.getElementById('bookingStart').value = preTime || '09:00';
+
+    // 显示预约人信息
+    const userGroup = document.getElementById('bookingUserGroup');
+    userGroup.style.display = 'block';
+    const displayName = currentUser.real_name || currentUser.name;
+    document.getElementById('bookingUserInfo').textContent = displayName;
+
+    if (!bookingId) {
+        document.getElementById('bookingEnd').value = preTime ?
+            `${String(parseInt(preTime.split(':')[0]) + 1).padStart(2, '0')}:00` : '10:00';
+        document.getElementById('bookingPurpose').value = '';
+        document.getElementById('bookingEquipment').value = '';
+    }
+
+    document.getElementById('bookingModal').classList.add('show');
+}
+
+async function viewBooking(id) {
+    const all = await api('/api/bookings');
+    if (!all) return;
+    const b = all.find(x => x.id === id);
+    if (!b) return;
+
+    // 权限检查：普通用户只能编辑自己的
+    if (!isAdmin() && b.user_id !== currentUser.id) {
+        showToast('只能查看自己的预约', 'warning');
+        return;
+    }
+
+    await openBookingModal(id);
+    document.getElementById('bookingDate').value = b.date;
+    document.getElementById('bookingStart').value = b.start_time;
+    document.getElementById('bookingEnd').value = b.end_time;
+    document.getElementById('bookingPurpose').value = b.purpose || '';
+    document.getElementById('bookingEquipment').value = b.equipment_id;
+}
+
+async function editBooking(id) {
+    await viewBooking(id);
+}
+
+async function saveBooking() {
+    const id = document.getElementById('bookingId').value;
+    const payload = {
+        equipment_id: parseInt(document.getElementById('bookingEquipment').value),
+        date: document.getElementById('bookingDate').value,
+        start_time: document.getElementById('bookingStart').value,
+        end_time: document.getElementById('bookingEnd').value,
+        purpose: document.getElementById('bookingPurpose').value,
+    };
+
+    // 用户ID：统一使用当前登录用户
+    payload.user_id = currentUser.id;
+
+    if (!payload.user_id || !payload.equipment_id || !payload.date || !payload.start_time || !payload.end_time) {
+        showToast('请填写所有必填项', 'warning');
+        return;
+    }
+
+    if (payload.start_time >= payload.end_time) {
+        showToast('结束时间必须晚于开始时间', 'warning');
+        return;
+    }
+
+    let result;
+    if (id) {
+        result = await api(`/api/bookings/${id}`, { method: 'PUT', body: payload });
+    } else {
+        result = await api('/api/bookings', { method: 'POST', body: payload });
+    }
+
+    if (result) {
+        showToast(id ? '预约更新成功' : '预约创建成功');
+        closeModal('bookingModal');
+        loadCalendar();
+    }
+}
+
+async function cancelBooking(id) {
+    if (!confirm('确定要取消这个预约吗？')) return;
+    const result = await api(`/api/bookings/${id}`, { method: 'DELETE' });
+    if (result) {
+        showToast('预约已取消');
+        loadCalendar();
+        loadBookings();
+    }
+}
+
+// ==================== 设备 CRUD ====================
+async function loadEquipment() {
+    const data = await api('/api/equipment');
+    if (!data) return;
+    equipmentList = data;
+
+    const cards = document.getElementById('equipmentCards');
+    cards.innerHTML = data.map(e => {
+        const statusText = { available: '可用', maintenance: '维护中', offline: '已停用' };
+        return `<div class="eq-card ${e.status}">
+            <h3>🔬 ${e.name}</h3>
+            <div class="eq-location">📍 ${e.location || '未设置'}</div>
+            <div class="eq-desc">${e.description || ''}</div>
+            <div style="margin-top:0.75rem;">
+                <span class="badge badge-${e.status}">${statusText[e.status]}</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    const tbody = document.getElementById('equipmentTableBody');
+    tbody.innerHTML = data.map(e => `
+        <tr>
+            <td>${e.id}</td>
+            <td><strong>${e.name}</strong></td>
+            <td>${e.location || '-'}</td>
+            <td><span class="badge badge-${e.status}">
+                ${{available:'可用',maintenance:'维护中',offline:'已停用'}[e.status]}
+            </span></td>
+            <td>${e.description || '-'}</td>
+            <td class="actions">
+                <button class="btn btn-sm" onclick="editEquipment(${e.id})">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEquipment(${e.id})">删除</button>
+            </td>
+        </tr>
+    `).join('');
+
+    updateEquipmentFilter();
+}
+
+function openEquipmentModal(id = null) {
+    document.getElementById('equipmentModalTitle').textContent = id ? '编辑设备' : '添加设备';
+    document.getElementById('equipmentId').value = id || '';
+    if (!id) {
+        document.getElementById('equipName').value = '';
+        document.getElementById('equipLocation').value = '';
+        document.getElementById('equipStatus').value = 'available';
+        document.getElementById('equipDesc').value = '';
+    }
+    document.getElementById('equipmentModal').classList.add('show');
+}
+
+async function editEquipment(id) {
+    const data = await api('/api/equipment');
+    const e = data.find(x => x.id === id);
+    if (!e) return;
+    openEquipmentModal(id);
+    document.getElementById('equipName').value = e.name;
+    document.getElementById('equipLocation').value = e.location || '';
+    document.getElementById('equipStatus').value = e.status || 'available';
+    document.getElementById('equipDesc').value = e.description || '';
+}
+
+async function saveEquipment() {
+    const id = document.getElementById('equipmentId').value;
+    const payload = {
+        name: document.getElementById('equipName').value,
+        location: document.getElementById('equipLocation').value,
+        status: document.getElementById('equipStatus').value,
+        description: document.getElementById('equipDesc').value,
+    };
+    if (!payload.name) { showToast('请输入设备名称', 'warning'); return; }
+
+    let result;
+    if (id) {
+        result = await api(`/api/equipment/${id}`, { method: 'PUT', body: payload });
+    } else {
+        result = await api('/api/equipment', { method: 'POST', body: payload });
+    }
+    if (result) {
+        showToast(id ? '设备更新成功' : '设备添加成功');
+        closeModal('equipmentModal');
+        loadEquipment();
+    }
+}
+
+async function deleteEquipment(id) {
+    if (!confirm('确定要删除这个设备吗？')) return;
+    const result = await api(`/api/equipment/${id}`, { method: 'DELETE' });
+    if (result) {
+        showToast('设备已删除');
+        loadEquipment();
+    }
+}
+
+// ==================== 用户 CRUD（管理员） ====================
+async function loadUsers() {
+    const data = await api('/api/users');
+    if (!data) return;
+    userList = data;
+
+    const tbody = document.getElementById('usersTableBody');
+    tbody.innerHTML = data.map(u => `
+        <tr>
+            <td>${u.id}</td>
+            <td><strong>${u.name}</strong>${u.real_name ? ' <span style="color:var(--text-secondary);font-weight:normal">(' + u.real_name + ')</span>' : ''}</td>
+            <td>${u.email || '-'}</td>
+            <td>${u.group_name || '-'}</td>
+            <td>${u.phone || '-'}</td>
+            <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-active'}">
+                ${u.role === 'admin' ? '管理员' : '用户'}
+            </span></td>
+            <td class="actions">
+                <button class="btn btn-sm" onclick="editUser(${u.id})">编辑</button>
+                ${u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">删除</button>` : ''}
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openUserModal(id = null) {
+    document.getElementById('userModalTitle').textContent = id ? '编辑用户' : '添加用户';
+    document.getElementById('userId').value = id || '';
+    if (!id) {
+        document.getElementById('userName').value = '';
+        document.getElementById('userRealName').value = '';
+        document.getElementById('userGroup').value = '';
+        document.getElementById('userPhone').value = '';
+        document.getElementById('userRole').value = 'user';
+    }
+    document.getElementById('userModal').classList.add('show');
+}
+
+async function editUser(id) {
+    const data = await api('/api/users');
+    const u = data.find(x => x.id === id);
+    if (!u) return;
+    openUserModal(id);
+    document.getElementById('userName').value = u.name;
+    document.getElementById('userRealName').value = u.real_name || '';
+    document.getElementById('userGroup').value = u.group_name || '';
+    document.getElementById('userPhone').value = u.phone || '';
+    document.getElementById('userRole').value = u.role || 'user';
+}
+
+async function saveUser() {
+    const id = document.getElementById('userId').value;
+    const payload = {
+        name: document.getElementById('userName').value,
+        real_name: document.getElementById('userRealName').value,
+        group_name: document.getElementById('userGroup').value,
+        phone: document.getElementById('userPhone').value,
+        role: document.getElementById('userRole').value,
+    };
+    if (!payload.name) { showToast('请输入用户昵称', 'warning'); return; }
+
+    let result;
+    if (id) {
+        result = await api(`/api/users/${id}`, { method: 'PUT', body: payload });
+    }
+    if (result) {
+        showToast('用户更新成功');
+        closeModal('userModal');
+        loadUsers();
+    }
+}
+
+async function deleteUser(id) {
+    if (!confirm('确定要删除这个用户吗？')) return;
+    const result = await api(`/api/users/${id}`, { method: 'DELETE' });
+    if (result) {
+        showToast('用户已删除');
+        loadUsers();
+    }
+}
+
+// ==================== 下拉选项加载 ====================
+async function loadEquipmentOptions() {
+    const data = await api('/api/equipment');
+    if (!data) return;
+    const select = document.getElementById('bookingEquipment');
+    const current = select.value;
+    select.innerHTML = '<option value="">请选择设备</option>' +
+        data.filter(e => e.status === 'available')
+            .map(e => `<option value="${e.id}">${e.name} (${e.location || '未设置位置'})</option>`)
+            .join('');
+    select.value = current;
+}
+
+async function loadUserOptions() {
+    // 已废弃：预约人统一使用当前登录用户，无需下拉框
+}
+
+function updateEquipmentFilter() {
+    const select = document.getElementById('filterEquipment');
+    const current = select.value;
+    select.innerHTML = '<option value="">全部设备</option>' +
+        equipmentList.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+    select.value = current;
+}
+
+// ==================== 点击模态框外关闭 ====================
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('show');
+    });
+});
+
+// ==================== 初始化 ====================
+document.addEventListener('DOMContentLoaded', () => {
+    // 检查登录状态
+    const saved = localStorage.getItem('currentUser');
+    const token = localStorage.getItem('authToken');
+    if (saved && token) {
+        try {
+            currentUser = JSON.parse(saved);
+            enterApp();
+        } catch (e) {
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('authToken');
+        }
+    }
+});
+</script>
+
+</body>
+</html>
