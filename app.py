@@ -252,7 +252,10 @@ def make_email_html(title, title_color, greeting, description, rows, footer=''):
             <p style="color:#6b7280;">{description}</p>
             <table style="width:100%;margin:16px 0;border-collapse:collapse;">{rows_html}</table>
             {footer}
-            <p style="color:#9ca3af;font-size:13px;">此邮件由超净台预约系统自动发送，请勿回复。</p>
+            <p style="color:#9ca3af;font-size:12px;border-top:1px solid #f0f0f0;padding-top:12px;margin-top:12px;">
+                贵州医科大学生物工程学院 · 超净台预约系统<br>
+                此邮件由系统自动发送，请勿回复。
+            </p>
         </div>
     </div>
     """
@@ -270,11 +273,11 @@ def send_booking_created(user_name, user_email, equipment_name, date, start_time
     if purpose:
         rows.append(('📝 用途', purpose))
     html = make_email_html(
-        '✅ 预约创建成功', '#22c55e,#16a34a',
-        f'你好，<strong>{user_name}</strong>：',
-        '你的超净台预约已成功创建：', rows
+        '🎉 预约成功！', '#22c55e,#16a34a',
+        f'<strong>{user_name}</strong>，好消息！',
+        '你的超净台已经就位，就等你来了：', rows
     )
-    send_email(user_email, f'预约成功：{date} {start_time}-{end_time} {equipment_name}', html)
+    send_email(user_email, f'[预约成功] {date} {start_time}-{end_time} {equipment_name}', html)
 
 
 def send_booking_cancelled(user_name, user_email, equipment_name, date, start_time, end_time):
@@ -282,16 +285,16 @@ def send_booking_cancelled(user_name, user_email, equipment_name, date, start_ti
     if not user_email:
         return
     html = make_email_html(
-        '❌ 预约已取消', '#ef4444,#dc2626',
-        f'你好，<strong>{user_name}</strong>：',
-        '你的以下预约已被取消：',
+        '👋 预约已取消', '#ef4444,#dc2626',
+        f'<strong>{user_name}</strong>，你的预约已取消',
+        '以下时间段已释放，其他人可以预约了：',
         [
             ('📅 日期', date),
             ('⏰ 时间', f'{start_time} - {end_time}'),
             ('🔬 设备', equipment_name),
         ]
     )
-    send_email(user_email, f'预约已取消：{date} {start_time}-{end_time} {equipment_name}', html)
+    send_email(user_email, f'[已取消] {date} {start_time}-{end_time} {equipment_name}', html)
 
 
 def send_booking_reminder(user_name, user_email, equipment_name, date, start_time, end_time, purpose):
@@ -306,11 +309,11 @@ def send_booking_reminder(user_name, user_email, equipment_name, date, start_tim
     if purpose:
         rows.append(('📝 用途', purpose))
     html = make_email_html(
-        '🔬 超净台预约提醒', '#4f6ef7,#3a54d4',
-        f'你好，<strong>{user_name}</strong>：',
-        '你有一个超净台预约即将开始，请提前做好准备：', rows
+        '⏰ 马上就到啦！', '#4f6ef7,#3a54d4',
+        f'<strong>{user_name}</strong>，准备出发！',
+        '你的超净台预约 15 分钟后开始，别忘了穿好实验服：', rows
     )
-    send_email(user_email, f'预约提醒：{date} {start_time}-{end_time} {equipment_name}', html)
+    send_email(user_email, f'[即将开始] {date} {start_time} {equipment_name}', html)
 
 
 # ==================== 定时邮件检查 ====================
