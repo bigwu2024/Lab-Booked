@@ -935,15 +935,18 @@ def index():
 
 # ==================== 启动 ====================
 
-if __name__ == '__main__':
+# 初始化数据库（gunicorn 通过 import 启动，不会走 __main__，所以放在模块级别）
+if DATABASE_URL:
     init_db()
+
+# 启动邮件提醒后台线程
+t = threading.Thread(target=reminder_loop, daemon=True)
+t.start()
+
+if __name__ == '__main__':
     print("=" * 50)
     print("  实验室超净台预约系统")
     print("=" * 50)
-
-    # 启动邮件提醒后台线程
-    t = threading.Thread(target=reminder_loop, daemon=True)
-    t.start()
 
     # Zeabur 部署支持：使用环境变量 PORT，host=0.0.0.0，生产环境关闭 debug
     port = int(os.environ.get('PORT', 5000))
