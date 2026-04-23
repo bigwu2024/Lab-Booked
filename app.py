@@ -3,6 +3,7 @@
 实验室超净台预约系统 - 后端服务
 Flask + MySQL，提供 RESTful API
 支持用户注册/登录、邮件提醒
+Deploy: mysql+pymysql
 """
 
 import os
