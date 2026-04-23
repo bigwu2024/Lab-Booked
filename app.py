@@ -27,30 +27,47 @@ CORS(app)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
+# Zeabur MySQL 自动注入的环境变量
+MYSQL_HOST = os.environ.get('MYSQL_HOST', '')
+MYSQL_PORT = os.environ.get('MYSQL_PORT', '3306')
+MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
+MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '')
+
 
 # ==================== 数据库工具 ====================
 
-def parse_db_url(url):
-    """解析 DATABASE_URL 为 pymysql 连接参数"""
-    # mysql://user:password@host:port/database
-    # 或 mysql://user:password@host/database
-    import re as _re
-    m = _re.match(r'mysql://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', url)
-    if not m:
-        raise ValueError(f'Invalid DATABASE_URL: {url}')
-    return {
-        'host': m.group(3),
-        'port': int(m.group(4) or 3306),
-        'user': m.group(1),
-        'password': m.group(2),
-        'database': m.group(5),
-        'charset': 'utf8mb4',
-    }
+def get_db_config():
+    """获取数据库连接配置，优先用 Zeabur 注入变量，其次解析 DATABASE_URL"""
+    if MYSQL_HOST and MYSQL_USERNAME:
+        # Zeabur 自动注入模式
+        return {
+            'host': MYSQL_HOST,
+            'port': int(MYSQL_PORT) if MYSQL_PORT else 3306,
+            'user': MYSQL_USERNAME,
+            'password': MYSQL_PASSWORD,
+            'database': MYSQL_DATABASE or 'zeabur',
+            'charset': 'utf8mb4',
+        }
+    if DATABASE_URL:
+        # 解析 DATABASE_URL
+        import re as _re
+        m = _re.match(r'(?:mysql|postgresql)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
+        if m:
+            return {
+                'host': m.group(3),
+                'port': int(m.group(4) or 3306),
+                'user': m.group(1),
+                'password': m.group(2),
+                'database': m.group(5),
+                'charset': 'utf8mb4',
+            }
+    raise ValueError('未配置数据库连接信息（需要 DATABASE_URL 或 MYSQL_* 环境变量）')
 
 
 def get_db():
     """获取数据库连接"""
-    params = parse_db_url(DATABASE_URL)
+    params = get_db_config()
     conn = pymysql.connect(**params, cursorclass=DictCursor)
     conn.autocommit(False)
     return conn
