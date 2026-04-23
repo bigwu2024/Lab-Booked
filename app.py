@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 """
 实验室超净台预约系统 - 后端服务
-Flask + SQLite，提供 RESTful API
+Flask + PostgreSQL，提供 RESTful API
 支持用户注册/登录、邮件提醒
 """
 
 import os
 import re
 import json
-import sqlite3
 import hashlib
 import secrets
 import threading
 import smtplib
+import psycopg2
+import psycopg2.extras
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
@@ -23,36 +24,57 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'booking.db')
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'email_config.json')
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 
 # ==================== 数据库工具 ====================
 
 def get_db():
     """获取数据库连接"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = False
     return conn
+
+
+def query_db(conn, sql, params=(), one=False):
+    """执行查询并返回字典列表"""
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(sql, params)
+    if one:
+        row = cur.fetchone()
+        cur.close()
+        return dict(row) if row else None
+    rows = cur.fetchall()
+    cur.close()
+    return [dict(r) for r in rows]
+
+
+def execute_db(conn, sql, params=()):
+    """执行写操作，返回 cursor"""
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    return cur
 
 
 def init_db():
     """初始化数据库表"""
     conn = get_db()
-    conn.executescript('''
+
+    cur = conn.cursor()
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS equipment (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             location TEXT DEFAULT '',
             status TEXT DEFAULT 'available' CHECK(status IN ('available', 'maintenance', 'offline')),
             description TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    ''')
 
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
             real_name TEXT DEFAULT '',
             email TEXT UNIQUE,
@@ -61,10 +83,12 @@ def init_db():
             phone TEXT DEFAULT '',
             role TEXT DEFAULT 'user' CHECK(role IN ('admin', 'user')),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    ''')
 
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS bookings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             equipment_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
             date TEXT NOT NULL,
@@ -72,60 +96,60 @@ def init_db():
             end_time TEXT NOT NULL,
             purpose TEXT DEFAULT '',
             status TEXT DEFAULT 'active' CHECK(status IN ('active', 'cancelled', 'completed')),
+            reminder_sent INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (equipment_id) REFERENCES equipment(id),
             FOREIGN KEY (user_id) REFERENCES users(id)
-        );
-
-        -- 创建索引加速查询（不依赖 email 列的索引放在迁移之后）
-        CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date);
-        CREATE INDEX IF NOT EXISTS idx_bookings_equipment ON bookings(equipment_id);
-        CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id);
+        )
     ''')
 
-    # 如果旧表没有某些字段，自动迁移
-    try:
-        cols = [r[1] for r in conn.execute('PRAGMA table_info(users)').fetchall()]
-        if 'email' not in cols:
-            conn.execute('ALTER TABLE users ADD COLUMN email TEXT')
-        if 'password_hash' not in cols:
-            conn.execute('ALTER TABLE users ADD COLUMN password_hash TEXT DEFAULT ""')
-        if 'real_name' not in cols:
-            conn.execute('ALTER TABLE users ADD COLUMN real_name TEXT DEFAULT ""')
-    except Exception:
-        pass
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS email_config (
+            id SERIAL PRIMARY KEY,
+            smtp_host TEXT NOT NULL,
+            smtp_port INTEGER DEFAULT 465,
+            smtp_user TEXT NOT NULL,
+            smtp_pass TEXT DEFAULT '',
+            use_ssl BOOLEAN DEFAULT TRUE,
+            sender_name TEXT DEFAULT '超净台预约系统',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
 
-    # 迁移完成后再创建依赖新列的索引
-    try:
-        conn.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
-    except Exception:
-        pass
+    # 创建索引
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_bookings_date ON bookings(date)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_bookings_equipment ON bookings(equipment_id)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id)')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)')
 
     conn.commit()
 
     # 插入默认设备（如果表为空）
-    count = conn.execute('SELECT COUNT(*) FROM equipment').fetchone()[0]
-    if count == 0:
-        conn.executemany(
-            'INSERT INTO equipment (name, location, description) VALUES (?, ?, ?)',
-            [
-                ('超净台 1号', '实验室 A101', '左侧标准超净台'),
-                ('超净台 2号', '实验室 A101', '右侧标准超净台'),
-                ('超净台 3号', '实验室 A102', '生物安全柜'),
-            ]
-        )
+    cur.execute('SELECT COUNT(*) FROM equipment')
+    if cur.fetchone()[0] == 0:
+        for name, loc, desc in [
+            ('超净台 1号', '实验室 A101', '左侧标准超净台'),
+            ('超净台 2号', '实验室 A101', '右侧标准超净台'),
+            ('超净台 3号', '实验室 A102', '生物安全柜'),
+        ]:
+            cur.execute(
+                'INSERT INTO equipment (name, location, description) VALUES (%s, %s, %s)',
+                (name, loc, desc)
+            )
+        conn.commit()
 
     # 插入默认管理员（如果表为空）
-    count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
-    if count == 0:
+    cur.execute('SELECT COUNT(*) FROM users')
+    if cur.fetchone()[0] == 0:
         pw_hash = hash_password('admin123')
-        conn.execute(
-            'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+        cur.execute(
+            'INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)',
             ('管理员', 'admin@lab.local', pw_hash, 'admin')
         )
+        conn.commit()
 
-    conn.commit()
+    cur.close()
     conn.close()
 
 
@@ -139,17 +163,33 @@ def hash_password(password):
 # ==================== 邮件配置 ====================
 
 def load_email_config():
-    """加载邮件配置"""
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    """从数据库加载邮件配置"""
+    try:
+        conn = get_db()
+        rows = query_db(conn, 'SELECT * FROM email_config ORDER BY id DESC LIMIT 1')
+        conn.close()
+        if rows:
+            return rows[0]
+    except Exception:
+        pass
     return None
 
 
 def save_email_config(config):
-    """保存邮件配置"""
-    with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    """保存邮件配置到数据库"""
+    conn = get_db()
+    # 清除旧配置，只保留一条
+    execute_db(conn, 'DELETE FROM email_config')
+    execute_db(conn, '''
+        INSERT INTO email_config (smtp_host, smtp_port, smtp_user, smtp_pass, use_ssl, sender_name)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    ''', (
+        config['smtp_host'], config.get('smtp_port', 465),
+        config['smtp_user'], config.get('smtp_pass', ''),
+        config.get('use_ssl', True), config.get('sender_name', '超净台预约系统')
+    ))
+    conn.commit()
+    conn.close()
 
 
 def send_email(to_email, subject, html_body):
@@ -296,33 +336,25 @@ def check_and_send_reminders():
     today = now.strftime('%Y-%m-%d')
     current_time = now.strftime('%H:%M')
 
-    # 找到今天开始时间在当前时间之后15分钟内的活跃预约
-    # 用 reminder_sent 字段避免重复发送（如果没有该字段则忽略）
-    try:
-        conn.execute("SELECT reminder_sent FROM bookings LIMIT 0")
-    except Exception:
-        conn.execute("ALTER TABLE bookings ADD COLUMN reminder_sent INTEGER DEFAULT 0")
-        conn.commit()
-
-    bookings = conn.execute('''
+    bookings = query_db(conn, '''
         SELECT b.id, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.email, e.name as equipment_name,
                b.date, b.start_time, b.end_time, b.purpose, b.reminder_sent
         FROM bookings b
         JOIN users u ON b.user_id = u.id
         JOIN equipment e ON b.equipment_id = e.id
-        WHERE b.date = ?
+        WHERE b.date = %s
           AND b.status = 'active'
           AND b.reminder_sent = 0
-          AND b.start_time >= ?
-          AND b.start_time <= ?
-    ''', (today, current_time, (now + timedelta(minutes=15)).strftime('%H:%M'))).fetchall()
+          AND b.start_time >= %s
+          AND b.start_time <= %s
+    ''', (today, current_time, (now + timedelta(minutes=15)).strftime('%H:%M')))
 
     for b in bookings:
         send_booking_reminder(
             b['user_name'], b['email'], b['equipment_name'],
             b['date'], b['start_time'], b['end_time'], b['purpose']
         )
-        conn.execute('UPDATE bookings SET reminder_sent = 1 WHERE id = ?', (b['id'],))
+        execute_db(conn, 'UPDATE bookings SET reminder_sent = 1 WHERE id = %s', (b['id'],))
 
     conn.commit()
     conn.close()
@@ -351,28 +383,32 @@ def register():
 
     conn = get_db()
     # 检查邮箱是否已注册
-    existing = conn.execute('SELECT id FROM users WHERE email = ?', (email,)).fetchone()
+    existing = query_db(conn, 'SELECT id FROM users WHERE email = %s', (email,), one=True)
     if existing:
         conn.close()
         return jsonify({'error': '该邮箱已被注册'}), 400
 
     pw_hash = hash_password(password)
     # 第一个注册的用户自动成为管理员
-    count = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    cur = execute_db(conn, 'SELECT COUNT(*) FROM users')
+    count = cur.fetchone()[0]
+    cur.close()
     role = 'admin' if count == 0 else 'user'
-    cursor = conn.execute(
-        'INSERT INTO users (name, real_name, email, password_hash, group_name, phone, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (name, real_name, email, pw_hash, group_name, phone, role)
-    )
-    conn.commit()
-    user_id = cursor.lastrowid
 
-    user = conn.execute('SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = ?', (user_id,)).fetchone()
+    cur = execute_db(conn, '''
+        INSERT INTO users (name, real_name, email, password_hash, group_name, phone, role)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    ''', (name, real_name, email, pw_hash, group_name, phone, role))
+    conn.commit()
+    user_id = cur.fetchone()[0]
+    cur.close()
+
+    user = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = %s', (user_id,), one=True)
     conn.close()
 
     return jsonify({
         'message': '注册成功',
-        'user': dict(user),
+        'user': user,
         'token': secrets.token_hex(32)
     }), 201
 
@@ -388,22 +424,20 @@ def login():
         return jsonify({'error': '请输入邮箱和密码'}), 400
 
     conn = get_db()
-    user = conn.execute(
-        'SELECT id, name, real_name, email, password_hash, group_name, phone, role FROM users WHERE email = ?',
-        (email,)
-    ).fetchone()
+    user = query_db(conn,
+        'SELECT id, name, real_name, email, password_hash, group_name, phone, role FROM users WHERE email = %s',
+        (email,), one=True)
     conn.close()
 
     if not user or user['password_hash'] != hash_password(password):
         return jsonify({'error': '邮箱或密码错误'}), 401
 
     token = secrets.token_hex(32)
-    user_dict = dict(user)
-    del user_dict['password_hash']
+    del user['password_hash']
 
     return jsonify({
         'message': '登录成功',
-        'user': user_dict,
+        'user': user,
         'token': token
     })
 
@@ -422,7 +456,7 @@ def update_profile():
     params = []
     for field in ['name', 'real_name', 'group_name', 'phone']:
         if field in data and data[field] is not None:
-            fields.append(f'{field} = ?')
+            fields.append(f'{field} = %s')
             params.append(data[field].strip())
 
     if not fields:
@@ -430,13 +464,13 @@ def update_profile():
         return jsonify({'error': '没有要更新的内容'}), 400
 
     params.append(uid)
-    conn.execute(f'UPDATE users SET {", ".join(fields)} WHERE id = ?', params)
+    execute_db(conn, f'UPDATE users SET {", ".join(fields)} WHERE id = %s', params)
     conn.commit()
 
-    user = conn.execute('SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = ?', (uid,)).fetchone()
+    user = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = %s', (uid,), one=True)
     conn.close()
 
-    return jsonify({'message': '信息更新成功', 'user': dict(user)})
+    return jsonify({'message': '信息更新成功', 'user': user})
 
 
 @app.route('/api/auth/password', methods=['PUT'])
@@ -453,12 +487,12 @@ def change_password():
         return jsonify({'error': '新密码至少4位'}), 400
 
     conn = get_db()
-    user = conn.execute('SELECT password_hash FROM users WHERE id = ?', (uid,)).fetchone()
+    user = query_db(conn, 'SELECT password_hash FROM users WHERE id = %s', (uid,), one=True)
     if not user or user['password_hash'] != hash_password(old_password):
         conn.close()
         return jsonify({'error': '原密码错误'}), 401
 
-    conn.execute('UPDATE users SET password_hash = ? WHERE id = ?', (hash_password(new_password), uid))
+    execute_db(conn, 'UPDATE users SET password_hash = %s WHERE id = %s', (hash_password(new_password), uid))
     conn.commit()
     conn.close()
 
@@ -518,9 +552,9 @@ def test_email():
 def get_equipment():
     """获取所有设备列表"""
     conn = get_db()
-    rows = conn.execute('SELECT * FROM equipment ORDER BY id').fetchall()
+    rows = query_db(conn, 'SELECT * FROM equipment ORDER BY id')
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(rows)
 
 
 @app.route('/api/equipment', methods=['POST'])
@@ -528,12 +562,13 @@ def add_equipment():
     """添加新设备"""
     data = request.json
     conn = get_db()
-    cursor = conn.execute(
-        'INSERT INTO equipment (name, location, description) VALUES (?, ?, ?)',
+    cur = execute_db(conn,
+        'INSERT INTO equipment (name, location, description) VALUES (%s, %s, %s)',
         (data['name'], data.get('location', ''), data.get('description', ''))
     )
     conn.commit()
-    equip_id = cursor.lastrowid
+    equip_id = cur.fetchone()[0]
+    cur.close()
     conn.close()
     return jsonify({'id': equip_id, 'message': '设备添加成功'}), 201
 
@@ -543,8 +578,8 @@ def update_equipment(eid):
     """更新设备信息"""
     data = request.json
     conn = get_db()
-    conn.execute(
-        'UPDATE equipment SET name=?, location=?, status=?, description=? WHERE id=?',
+    execute_db(conn,
+        'UPDATE equipment SET name=%s, location=%s, status=%s, description=%s WHERE id=%s',
         (data['name'], data.get('location', ''), data.get('status', 'available'),
          data.get('description', ''), eid)
     )
@@ -557,14 +592,16 @@ def update_equipment(eid):
 def delete_equipment(eid):
     """删除设备"""
     conn = get_db()
-    bookings = conn.execute(
-        'SELECT COUNT(*) FROM bookings WHERE equipment_id=? AND status="active"',
+    cur = execute_db(conn,
+        "SELECT COUNT(*) FROM bookings WHERE equipment_id=%s AND status='active'",
         (eid,)
-    ).fetchone()[0]
+    )
+    bookings = cur.fetchone()[0]
+    cur.close()
     if bookings > 0:
         conn.close()
         return jsonify({'error': '该设备有活跃预约，无法删除'}), 400
-    conn.execute('DELETE FROM equipment WHERE id=?', (eid,))
+    execute_db(conn, 'DELETE FROM equipment WHERE id=%s', (eid,))
     conn.commit()
     conn.close()
     return jsonify({'message': '设备删除成功'})
@@ -576,9 +613,9 @@ def delete_equipment(eid):
 def get_users():
     """获取所有用户（不返回密码）"""
     conn = get_db()
-    rows = conn.execute('SELECT id, name, real_name, email, group_name, phone, role, created_at FROM users ORDER BY id').fetchall()
+    rows = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role, created_at FROM users ORDER BY id')
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(rows)
 
 
 @app.route('/api/users/<int:uid>', methods=['PUT'])
@@ -586,8 +623,8 @@ def update_user(uid):
     """更新用户信息（管理员）"""
     data = request.json
     conn = get_db()
-    conn.execute(
-        'UPDATE users SET name=?, real_name=?, group_name=?, phone=?, role=? WHERE id=?',
+    execute_db(conn,
+        'UPDATE users SET name=%s, real_name=%s, group_name=%s, phone=%s, role=%s WHERE id=%s',
         (data['name'], data.get('real_name', ''), data.get('group_name', ''), data.get('phone', ''),
          data.get('role', 'user'), uid)
     )
@@ -600,14 +637,16 @@ def update_user(uid):
 def delete_user(uid):
     """删除用户"""
     conn = get_db()
-    bookings = conn.execute(
-        'SELECT COUNT(*) FROM bookings WHERE user_id=? AND status="active"',
+    cur = execute_db(conn,
+        "SELECT COUNT(*) FROM bookings WHERE user_id=%s AND status='active'",
         (uid,)
-    ).fetchone()[0]
+    )
+    bookings = cur.fetchone()[0]
+    cur.close()
     if bookings > 0:
         conn.close()
         return jsonify({'error': '该用户有活跃预约，无法删除'}), 400
-    conn.execute('DELETE FROM users WHERE id=? AND role != "admin"', (uid,))
+    execute_db(conn, "DELETE FROM users WHERE id=%s AND role != 'admin'", (uid,))
     conn.commit()
     conn.close()
     return jsonify({'message': '用户删除成功'})
@@ -635,25 +674,25 @@ def get_bookings():
     params = []
 
     if equipment_id:
-        query += ' AND b.equipment_id = ?'
+        query += ' AND b.equipment_id = %s'
         params.append(int(equipment_id))
     if date_from:
-        query += ' AND b.date >= ?'
+        query += ' AND b.date >= %s'
         params.append(date_from)
     if date_to:
-        query += ' AND b.date <= ?'
+        query += ' AND b.date <= %s'
         params.append(date_to)
     if user_id:
-        query += ' AND b.user_id = ?'
+        query += ' AND b.user_id = %s'
         params.append(int(user_id))
     if status:
-        query += ' AND b.status = ?'
+        query += " AND b.status = %s"
         params.append(status)
 
     query += ' ORDER BY b.date, b.start_time, b.equipment_id'
-    rows = conn.execute(query, params).fetchall()
+    rows = query_db(conn, query, params)
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(rows)
 
 
 @app.route('/api/bookings/week', methods=['GET'])
@@ -668,21 +707,20 @@ def get_week_bookings():
     sunday = monday + timedelta(days=6)
 
     conn = get_db()
-    query = '''
+    rows = query_db(conn, '''
         SELECT b.*, e.name as equipment_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.group_name
         FROM bookings b
         JOIN equipment e ON b.equipment_id = e.id
         JOIN users u ON b.user_id = u.id
-        WHERE b.date >= ? AND b.date <= ? AND b.status = 'active'
+        WHERE b.date >= %s AND b.date <= %s AND b.status = 'active'
         ORDER BY b.date, b.start_time, b.equipment_id
-    '''
-    rows = conn.execute(query, (monday.strftime('%Y-%m-%d'), sunday.strftime('%Y-%m-%d'))).fetchall()
+    ''', (monday.strftime('%Y-%m-%d'), sunday.strftime('%Y-%m-%d')))
     conn.close()
 
     return jsonify({
         'week_start': monday.strftime('%Y-%m-%d'),
         'week_end': sunday.strftime('%Y-%m-%d'),
-        'bookings': [dict(r) for r in rows]
+        'bookings': rows
     })
 
 
@@ -693,17 +731,17 @@ def create_booking():
     conn = get_db()
 
     # 冲突检测
-    conflict = conn.execute('''
+    conflict = query_db(conn, '''
         SELECT b.id, e.name as equip_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, b.start_time, b.end_time
         FROM bookings b
         JOIN equipment e ON b.equipment_id = e.id
         JOIN users u ON b.user_id = u.id
-        WHERE b.equipment_id = ?
-          AND b.date = ?
+        WHERE b.equipment_id = %s
+          AND b.date = %s
           AND b.status = 'active'
-          AND b.start_time < ?
-          AND b.end_time > ?
-    ''', (data['equipment_id'], data['date'], data['end_time'], data['start_time'])).fetchone()
+          AND b.start_time < %s
+          AND b.end_time > %s
+    ''', (data['equipment_id'], data['date'], data['end_time'], data['start_time']), one=True)
 
     if conflict:
         conn.close()
@@ -713,16 +751,16 @@ def create_booking():
         }), 409
 
     # 同一用户同一时间段不能预约多台设备
-    same_user_conflict = conn.execute('''
+    same_user_conflict = query_db(conn, '''
         SELECT b.id, e.name as equip_name
         FROM bookings b
         JOIN equipment e ON b.equipment_id = e.id
-        WHERE b.user_id = ?
-          AND b.date = ?
+        WHERE b.user_id = %s
+          AND b.date = %s
           AND b.status = 'active'
-          AND b.start_time < ?
-          AND b.end_time > ?
-    ''', (data['user_id'], data['date'], data['end_time'], data['start_time'])).fetchone()
+          AND b.start_time < %s
+          AND b.end_time > %s
+    ''', (data['user_id'], data['date'], data['end_time'], data['start_time']), one=True)
 
     if same_user_conflict:
         conn.close()
@@ -731,19 +769,20 @@ def create_booking():
             'detail': f"你在 {data['start_time']}-{data['end_time']} 已经预约了 {same_user_conflict['equip_name']}"
         }), 409
 
-    cursor = conn.execute('''
+    cur = execute_db(conn, '''
         INSERT INTO bookings (equipment_id, user_id, date, start_time, end_time, purpose)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s)
     ''', (
         data['equipment_id'], data['user_id'], data['date'],
         data['start_time'], data['end_time'], data.get('purpose', '')
     ))
     conn.commit()
-    booking_id = cursor.lastrowid
+    booking_id = cur.fetchone()[0]
+    cur.close()
 
     # 发送预约成功邮件通知
-    user = conn.execute('SELECT name, email FROM users WHERE id = ?', (data['user_id'],)).fetchone()
-    equip = conn.execute('SELECT name FROM equipment WHERE id = ?', (data['equipment_id'],)).fetchone()
+    user = query_db(conn, 'SELECT name, email FROM users WHERE id = %s', (data['user_id'],), one=True)
+    equip = query_db(conn, 'SELECT name FROM equipment WHERE id = %s', (data['equipment_id'],), one=True)
     if user and equip:
         send_booking_created(
             user['name'], user['email'], equip['name'],
@@ -762,19 +801,19 @@ def update_booking(bid):
     conn = get_db()
 
     # 冲突检测（排除自身）
-    conflict = conn.execute('''
+    conflict = query_db(conn, '''
         SELECT b.id, e.name as equip_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, b.start_time, b.end_time
         FROM bookings b
         JOIN equipment e ON b.equipment_id = e.id
         JOIN users u ON b.user_id = u.id
-        WHERE b.equipment_id = ?
-          AND b.date = ?
+        WHERE b.equipment_id = %s
+          AND b.date = %s
           AND b.status = 'active'
-          AND b.start_time < ?
-          AND b.end_time > ?
-          AND b.id != ?
+          AND b.start_time < %s
+          AND b.end_time > %s
+          AND b.id != %s
     ''', (data.get('equipment_id'), data.get('date'),
-          data['end_time'], data['start_time'], bid)).fetchone()
+          data['end_time'], data['start_time'], bid), one=True)
 
     if conflict:
         conn.close()
@@ -783,11 +822,11 @@ def update_booking(bid):
             'detail': f"{conflict['equip_name']} 在 {conflict['start_time']}-{conflict['end_time']} 已被 {conflict['user_name']} 预约"
         }), 409
 
-    conn.execute('''
+    execute_db(conn, '''
         UPDATE bookings SET
-            equipment_id=?, date=?, start_time=?, end_time=?,
-            purpose=?, status=?, updated_at=CURRENT_TIMESTAMP
-        WHERE id=?
+            equipment_id=%s, date=%s, start_time=%s, end_time=%s,
+            purpose=%s, status=%s, updated_at=CURRENT_TIMESTAMP
+        WHERE id=%s
     ''', (
         data.get('equipment_id'), data.get('date'),
         data['start_time'], data['end_time'],
@@ -804,16 +843,16 @@ def cancel_booking(bid):
     conn = get_db()
 
     # 先获取预约信息用于发送邮件
-    booking = conn.execute('''
+    booking = query_db(conn, '''
         SELECT b.date, b.start_time, b.end_time, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.email, e.name as equip_name
         FROM bookings b
         JOIN users u ON b.user_id = u.id
         JOIN equipment e ON b.equipment_id = e.id
-        WHERE b.id = ? AND b.status = 'active'
-    ''', (bid,)).fetchone()
+        WHERE b.id = %s AND b.status = 'active'
+    ''', (bid,), one=True)
 
-    conn.execute(
-        "UPDATE bookings SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=?",
+    execute_db(conn,
+        "UPDATE bookings SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=%s",
         (bid,)
     )
     conn.commit()
@@ -836,41 +875,44 @@ def get_stats():
     """获取预约统计数据"""
     conn = get_db()
 
-    total_bookings = conn.execute(
-        'SELECT COUNT(*) FROM bookings WHERE status="active"'
-    ).fetchone()[0]
+    cur = execute_db(conn, "SELECT COUNT(*) FROM bookings WHERE status='active'")
+    total_bookings = cur.fetchone()[0]
+    cur.close()
 
     today = datetime.now().strftime('%Y-%m-%d')
-    today_bookings = conn.execute(
-        'SELECT COUNT(*) FROM bookings WHERE date=? AND status="active"',
-        (today,)
-    ).fetchone()[0]
+    cur = execute_db(conn, "SELECT COUNT(*) FROM bookings WHERE date=%s AND status='active'", (today,))
+    today_bookings = cur.fetchone()[0]
+    cur.close()
 
-    total_equipment = conn.execute('SELECT COUNT(*) FROM equipment').fetchone()[0]
-    total_users = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+    cur = execute_db(conn, 'SELECT COUNT(*) FROM equipment')
+    total_equipment = cur.fetchone()[0]
+    cur.close()
+
+    cur = execute_db(conn, 'SELECT COUNT(*) FROM users')
+    total_users = cur.fetchone()[0]
+    cur.close()
 
     # 近7天每天预约数
     week_stats = []
     for i in range(6, -1, -1):
         d = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-        count = conn.execute(
-            'SELECT COUNT(*) FROM bookings WHERE date=? AND status="active"',
-            (d,)
-        ).fetchone()[0]
+        cur = execute_db(conn, "SELECT COUNT(*) FROM bookings WHERE date=%s AND status='active'", (d,))
+        count = cur.fetchone()[0]
+        cur.close()
         week_stats.append({'date': d, 'count': count})
 
     # 各设备使用率（近7天）
-    equipment_usage = conn.execute('''
+    equipment_usage = query_db(conn, '''
         SELECT e.id, e.name, COUNT(b.id) as booking_count
         FROM equipment e
         LEFT JOIN bookings b ON e.id = b.equipment_id
-            AND b.date >= ? AND b.date <= ? AND b.status = 'active'
+            AND b.date >= %s AND b.date <= %s AND b.status = 'active'
         GROUP BY e.id
         ORDER BY booking_count DESC
     ''', (
         (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d'),
         today
-    )).fetchall()
+    ))
 
     conn.close()
 
@@ -880,7 +922,7 @@ def get_stats():
         'total_equipment': total_equipment,
         'total_users': total_users,
         'week_stats': week_stats,
-        'equipment_usage': [dict(r) for r in equipment_usage]
+        'equipment_usage': equipment_usage
     })
 
 

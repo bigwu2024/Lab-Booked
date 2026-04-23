@@ -15,7 +15,7 @@ env/
 # Database (SQLite)
 *.db
 
-# Email config (contains sensitive data)
+# Email config (now stored in database)
 email_config.json
 
 # IDE
