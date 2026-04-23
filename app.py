@@ -27,12 +27,12 @@ CORS(app)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-# Zeabur MySQL 自动注入的环境变量
-MYSQL_HOST = os.environ.get('MYSQL_HOST', '')
-MYSQL_PORT = os.environ.get('MYSQL_PORT', '3306')
-MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
-MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '')
+# Zeabur 数据库环境变量（支持 MySQL / MariaDB）
+MYSQL_HOST = os.environ.get('MYSQL_HOST', '') or os.environ.get('MARIADB_HOST', '')
+MYSQL_PORT = os.environ.get('MYSQL_PORT', '') or os.environ.get('MARIADB_PORT', '3306')
+MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '')
+MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '')
 
 
 # ==================== 数据库工具 ====================
@@ -40,7 +40,6 @@ MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '')
 def get_db_config():
     """获取数据库连接配置，优先用 Zeabur 注入变量，其次解析 DATABASE_URL"""
     if MYSQL_HOST and MYSQL_USERNAME:
-        # Zeabur 自动注入模式
         return {
             'host': MYSQL_HOST,
             'port': int(MYSQL_PORT) if MYSQL_PORT else 3306,
@@ -50,9 +49,8 @@ def get_db_config():
             'charset': 'utf8mb4',
         }
     if DATABASE_URL:
-        # 解析 DATABASE_URL
         import re as _re
-        m = _re.match(r'(?:mysql|postgresql)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
+        m = _re.match(r'(?:mysql|postgresql|mariadb)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
         if m:
             return {
                 'host': m.group(3),
@@ -62,7 +60,7 @@ def get_db_config():
                 'database': m.group(5),
                 'charset': 'utf8mb4',
             }
-    raise ValueError('未配置数据库连接信息（需要 DATABASE_URL 或 MYSQL_* 环境变量）')
+    raise ValueError('未配置数据库连接信息（需要 DATABASE_URL 或 MYSQL_*/MARIADB_* 环境变量）')
 
 
 def get_db():
