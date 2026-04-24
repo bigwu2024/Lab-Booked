@@ -976,7 +976,7 @@ def _delayed_init():
             print(f"[启动] 数据库初始化失败（第{i+1}次）: {e}")
             time.sleep(3)
 
-if DATABASE_URL:
+if DATABASE_URL or (MYSQL_HOST and MYSQL_USERNAME):
     _delayed_init()
 
 # 启动邮件提醒后台线程
