@@ -969,6 +969,35 @@ def get_stats():
     })
 
 
+# ==================== 调试 API ====================
+
+@app.route('/api/debug/db', methods=['GET'])
+def debug_db():
+    """检查数据库连接和表状态"""
+    try:
+        config = get_db_config()
+        conn = pymysql.connect(**config, cursorclass=DictCursor)
+        with conn.cursor() as cur:
+            cur.execute("SHOW TABLES")
+            tables = [list(r.values())[0] for r in cur.fetchall()]
+            result = {'connected': True, 'host': config['host'], 'tables': tables}
+
+            if 'users' in tables:
+                cur.execute("SELECT COUNT(*) as cnt FROM users")
+                result['user_count'] = cur.fetchone()['cnt']
+                cur.execute("SELECT id, name, email, role FROM users LIMIT 5")
+                result['users'] = [dict(r) for r in cur.fetchall()]
+
+            if 'equipment' in tables:
+                cur.execute("SELECT COUNT(*) as cnt FROM equipment")
+                result['equipment_count'] = cur.fetchone()['cnt']
+
+        conn.close()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'connected': False, 'error': str(e)})
+
+
 # ==================== 前端路由 ====================
 
 @app.route('/')
