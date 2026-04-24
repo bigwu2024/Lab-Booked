@@ -963,21 +963,45 @@ def index():
 
 # ==================== 启动 ====================
 
-# 初始化数据库（gunicorn 通过 import 启动，不会走 __main__，所以放在模块级别）
+_db_initialized = False
+
+def _ensure_db():
+    """确保数据库已初始化，在首次 API 请求时触发"""
+    global _db_initialized
+    if _db_initialized:
+        return True
+    try:
+        init_db()
+        _db_initialized = True
+        print("[启动] 数据库初始化成功")
+        return True
+    except Exception as e:
+        print(f"[启动] 数据库初始化失败: {e}")
+        return False
+
 def _delayed_init():
-    """延迟初始化数据库，最多重试5次"""
+    """启动时尝试初始化数据库，最多重试10次"""
     import time
-    for i in range(5):
+    for i in range(10):
         try:
             init_db()
+            global _db_initialized
+            _db_initialized = True
             print(f"[启动] 数据库初始化成功（第{i+1}次尝试）")
-            return
+            return True
         except Exception as e:
             print(f"[启动] 数据库初始化失败（第{i+1}次）: {e}")
-            time.sleep(3)
+            time.sleep(5)
+    return False
 
+# 启动时尝试初始化（如果配置了数据库）
 if DATABASE_URL or (MYSQL_HOST and MYSQL_USERNAME):
     _delayed_init()
+
+# 首次请求时自动初始化数据库（兜底）
+@app.before_request
+def before_request_hook():
+    _ensure_db()
 
 # 启动邮件提醒后台线程
 t = threading.Thread(target=reminder_loop, daemon=True)
