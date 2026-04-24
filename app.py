@@ -25,6 +25,21 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
+
+# 覆盖 Zeabur 默认的严格 CSP 策略，允许前端 JS 正常运行
+@app.after_request
+def set_csp(response):
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self'; "
+        "connect-src 'self'"
+    )
+    return response
+
+
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 # Zeabur 数据库环境变量（支持 MySQL / MariaDB）
