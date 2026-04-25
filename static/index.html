@@ -1932,7 +1932,7 @@ async function doLogin() {
         return;
     }
 
-    const data = await api('/api/login', {
+    const data = await api('/api/auth/login', {
         method: 'POST',
         body: { email, password }
     });
@@ -1959,7 +1959,7 @@ async function doRegister() {
     if (!email) { showLoginError('请输入邮箱'); return; }
     if (!password || password.length < 4) { showLoginError('密码至少4位'); return; }
 
-    const data = await api('/api/register', {
+    const data = await api('/api/auth/register', {
         method: 'POST',
         body: { name, real_name, email, password, group_name, phone }
     });
