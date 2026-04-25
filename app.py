@@ -43,11 +43,11 @@ def set_csp(response):
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 # Zeabur 数据库环境变量（支持 MySQL / MariaDB）
-MYSQL_HOST = os.environ.get('MYSQL_HOST', '') or os.environ.get('MARIADB_HOST', '') or os.environ.get('MARIADB_HOST', '')
-MYSQL_PORT = os.environ.get('MYSQL_PORT', '') or os.environ.get('MARIADB_PORT', '3306')
-MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '')
-MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '')
+MYSQL_HOST = os.environ.get('MYSQL_HOST', '') or os.environ.get('MARIADB_HOST', '') or os.environ.get('DATABASE_HOST', '')
+MYSQL_PORT = os.environ.get('MYSQL_PORT', '') or os.environ.get('MARIADB_PORT', '') or os.environ.get('DATABASE_PORT', '3306')
+MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '') or os.environ.get('MARIADB_ROOT_USER', '') or os.environ.get('DATABASE_USERNAME', '')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '') or os.environ.get('MARIADB_ROOT_PASSWORD', '') or os.environ.get('DATABASE_PASSWORD', '')
+MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '') or os.environ.get('DATABASE_NAME', '') or 'zeabur'
 
 
 # ==================== 数据库工具 ====================
