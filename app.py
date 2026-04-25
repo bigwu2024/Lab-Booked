@@ -1051,6 +1051,9 @@ def before_request_hook():
 t = threading.Thread(target=reminder_loop, daemon=True)
 t.start()
 
+# 模块加载时初始化数据库（确保 WSGI/Gunicorn 部署也能执行）
+init_db()
+
 if __name__ == '__main__':
     print("=" * 50)
     print("  实验室超净台预约系统")
