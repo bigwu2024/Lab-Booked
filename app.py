@@ -1009,19 +1009,31 @@ def index():
 
 _db_initialized = False
 
+_reminder_started = False
+
 def _ensure_db():
-    """确保数据库已初始化，在首次 API 请求时触发"""
-    global _db_initialized
+    """确保数据库已初始化，在首次 API 请求时触发（带重试）"""
+    global _db_initialized, _reminder_started
     if _db_initialized:
         return True
-    try:
-        init_db()
-        _db_initialized = True
-        print("[启动] 数据库初始化成功")
-        return True
-    except Exception as e:
-        print(f"[启动] 数据库初始化失败: {e}")
-        return False
+    import time
+    for attempt in range(5):
+        try:
+            init_db()
+            _db_initialized = True
+            print("[启动] 数据库初始化成功")
+            # 启动提醒线程（只启动一次）
+            if not _reminder_started:
+                _reminder_started = True
+                t = threading.Thread(target=reminder_loop, daemon=True)
+                t.start()
+                print("[启动] 邮件提醒线程已启动")
+            return True
+        except Exception as e:
+            print(f"[启动] 数据库初始化失败（第{attempt+1}次）: {e}")
+            time.sleep(3)
+    print("[启动] 数据库初始化最终失败，请检查数据库配置")
+    return False
 
 def _delayed_init():
     """启动时尝试初始化数据库，最多重试10次"""
@@ -1038,21 +1050,15 @@ def _delayed_init():
             time.sleep(5)
     return False
 
-# 启动时尝试初始化（如果配置了数据库）
-if DATABASE_URL or (MYSQL_HOST and MYSQL_USERNAME):
-    _delayed_init()
+# [数据库初始化在 before_request 中延迟执行]
 
 # 首次请求时自动初始化数据库（兜底）
 @app.before_request
 def before_request_hook():
     _ensure_db()
 
-# 启动邮件提醒后台线程
-t = threading.Thread(target=reminder_loop, daemon=True)
-t.start()
+# [邮件提醒线程在应用就绪后启动]
 
-# 模块加载时初始化数据库（确保 WSGI/Gunicorn 部署也能执行）
-init_db()
 
 if __name__ == '__main__':
     print("=" * 50)
