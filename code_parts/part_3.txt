@@ -1,0 +1,200 @@
+401|            b['date'], b['start_time'], b['end_time'], b['purpose']
+402|        )
+403|        execute_db(conn, 'UPDATE bookings SET reminder_sent = 1 WHERE id = %s', (b['id'],))
+404|
+405|    conn.commit()
+406|    conn.close()
+407|
+408|
+409|# ==================== 认证 API ====================
+410|
+411|@app.route('/api/auth/register', methods=['POST'])
+412|def register():
+413|    """用户注册"""
+414|    data = request.json
+415|    name = data.get('name', '').strip()
+416|    real_name = data.get('real_name', '').strip()
+417|    email = data.get('email', '').strip()
+418|    password = data.get('password', '')
+419|    group_name = data.get('group_name', '').strip()
+420|    phone = data.get('phone', '').strip()
+421|
+422|    # 验证
+423|    if not name or len(name) < 1:
+424|        return jsonify({'error': '请输入昵称'}), 400
+425|    if not email or not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+426|        return jsonify({'error': '请输入有效的邮箱地址'}), 400
+427|    if not password or len(password) < 4:
+428|        return jsonify({'error': '密码至少4位'}), 400
+429|
+430|    conn = get_db()
+431|    # 检查邮箱是否已注册
+432|    existing = query_db(conn, 'SELECT id FROM users WHERE email = %s', (email,), one=True)
+433|    if existing:
+434|        conn.close()
+435|        return jsonify({'error': '该邮箱已被注册'}), 400
+436|
+437|    pw_hash = hash_password(password)
+438|    # 第一个注册的用户自动成为管理员
+439|    with conn.cursor() as cur:
+440|        cur.execute('SELECT COUNT(*) as cnt FROM users')
+441|        count = cur.fetchone()['cnt']
+442|    role = 'admin' if count == 0 else 'user'
+443|
+444|    with conn.cursor() as cur:
+445|        cur.execute('''
+446|            INSERT INTO users (name, real_name, email, password_hash, group_name, phone, role)
+447|            VALUES (%s, %s, %s, %s, %s, %s, %s)
+448|        ''', (name, real_name, email, pw_hash, group_name, phone, role))
+449|        user_id = cur.lastrowid
+450|    conn.commit()
+451|
+452|    user = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = %s', (user_id,), one=True)
+453|    conn.close()
+454|
+455|    return jsonify({
+456|        'message': '注册成功',
+457|        'user': user,
+458|        'token': secrets.token_hex(32)
+459|    }), 201
+460|
+461|
+462|@app.route('/api/auth/login', methods=['POST'])
+463|def login():
+464|    """用户登录"""
+465|    data = request.json
+466|    email = data.get('email', '').strip()
+467|    password = data.get('password', '')
+468|
+469|    if not email or not password:
+470|        return jsonify({'error': '请输入邮箱和密码'}), 400
+471|
+472|    conn = get_db()
+473|    user = query_db(conn,
+474|        'SELECT id, name, real_name, email, password_hash, group_name, phone, role FROM users WHERE email = %s',
+475|        (email,), one=True)
+476|    conn.close()
+477|
+478|    if not user or user['password_hash'] != hash_password(password):
+479|        return jsonify({'error': '邮箱或密码错误'}), 401
+480|
+481|    token = secrets.token_hex(32)
+482|    del user['password_hash']
+483|
+484|    return jsonify({
+485|        'message': '登录成功',
+486|        'user': user,
+487|        'token': token
+488|    })
+489|
+490|
+491|@app.route('/api/auth/profile', methods=['PUT'])
+492|def update_profile():
+493|    """更新个人信息"""
+494|    data = request.json
+495|    uid = data.get('id')
+496|    if not uid:
+497|        return jsonify({'error': '缺少用户ID'}), 400
+498|
+499|    conn = get_db()
+500|    # 允许更新的字段
+501|    fields = []
+502|    params = []
+503|    for field in ['name', 'real_name', 'group_name', 'phone']:
+504|        if field in data and data[field] is not None:
+505|            fields.append(f'{field} = %s')
+506|            params.append(data[field].strip())
+507|
+508|    if not fields:
+509|        conn.close()
+510|        return jsonify({'error': '没有要更新的内容'}), 400
+511|
+512|    params.append(uid)
+513|    execute_db(conn, f'UPDATE users SET {", ".join(fields)} WHERE id = %s', params)
+514|    conn.commit()
+515|
+516|    user = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = %s', (uid,), one=True)
+517|    conn.close()
+518|
+519|    return jsonify({'message': '信息更新成功', 'user': user})
+520|
+521|
+522|@app.route('/api/auth/password', methods=['PUT'])
+523|def change_password():
+524|    """修改密码"""
+525|    data = request.json
+526|    uid = data.get('id')
+527|    old_password = data.get('old_password', '')
+528|    new_password = data.get('new_password', '')
+529|
+530|    if not uid or not old_password or not new_password:
+531|        return jsonify({'error': '请填写完整信息'}), 400
+532|    if len(new_password) < 4:
+533|        return jsonify({'error': '新密码至少4位'}), 400
+534|
+535|    conn = get_db()
+536|    user = query_db(conn, 'SELECT password_hash FROM users WHERE id = %s', (uid,), one=True)
+537|    if not user or user['password_hash'] != hash_password(old_password):
+538|        conn.close()
+539|        return jsonify({'error': '原密码错误'}), 401
+540|
+541|    execute_db(conn, 'UPDATE users SET password_hash = %s WHERE id = %s', (hash_password(new_password), uid))
+542|    conn.commit()
+543|    conn.close()
+544|
+545|    return jsonify({'message': '密码修改成功'})
+546|
+547|
+548|# ==================== 邮件配置 API ====================
+549|
+550|@app.route('/api/email-config', methods=['GET'])
+551|def get_email_config_api():
+552|    """获取邮件配置（隐藏密码）"""
+553|    config = load_email_config()
+554|    if config:
+555|        safe = {k: v for k, v in config.items() if k != 'smtp_pass'}
+556|        safe['configured'] = True
+557|        return jsonify(safe)
+558|    return jsonify({'configured': False})
+559|
+560|
+561|@app.route('/api/email-config', methods=['POST'])
+562|def save_email_config_api():
+563|    """保存邮件配置"""
+564|    data = request.json
+565|    config = {
+566|        'smtp_host': data.get('smtp_host', '').strip(),
+567|        'smtp_port': int(data.get('smtp_port', 465)),
+568|        'smtp_user': data.get('smtp_user', '').strip(),
+569|        'smtp_pass': data.get('smtp_pass', ''),
+570|        'use_ssl': data.get('use_ssl', True),
+571|        'sender_name': data.get('sender_name', '超净台预约系统'),
+572|    }
+573|
+574|    if not config['smtp_host'] or not config['smtp_user']:
+575|        return jsonify({'error': '请填写SMTP服务器和发件邮箱'}), 400
+576|
+577|    save_email_config(config)
+578|    return jsonify({'message': '邮件配置保存成功'})
+579|
+580|
+581|@app.route('/api/email-test', methods=['POST'])
+582|def test_email():
+583|    """测试邮件发送"""
+584|    data = request.json
+585|    to = data.get('to_email', '').strip()
+586|    if not to:
+587|        return jsonify({'error': '请输入收件邮箱'}), 400
+588|
+589|    success, err_msg = send_email(to, '预约系统邮件测试', '<h3>测试邮件</h3><p>如果你收到这封邮件，说明邮件配置正确！</p>')
+590|    if success:
+591|        return jsonify({'message': '测试邮件已发送，请检查收件箱'})
+592|    return jsonify({'error': f'邮件发送失败：{err_msg}'}), 500
+593|
+594|
+595|# ==================== 设备 API ====================
+596|
+597|@app.route('/api/equipment', methods=['GET'])
+598|def get_equipment():
+599|    """获取所有设备列表"""
+600|    conn = get_db()

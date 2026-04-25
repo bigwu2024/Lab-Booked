@@ -1,0 +1,62 @@
+=== doLogin found at char 64541, line 1926 ===
+async function doLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+
+    if (!email || !password) {
+        showLoginError('请输入邮箱和密码');
+        return;
+    }
+
+    const data = await api('/api/auth/login', {
+        method: 'POST',
+        body: { email, password }
+    });
+
+    if (data) {
+        currentUser = data.user;
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        enterApp();
+    } else {
+        showLoginError('邮箱或密码错误');
+    }
+}
+
+async function doRegister() {
+    const real_name = document.getElementById('regRealName').value.trim();
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const group_name = document.getElementById('regGroup').value.trim
+
+=== doRegister found at char 65166, line 1950 ===
+async function doRegister() {
+    const real_name = document.getElementById('regRealName').value.trim();
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const group_name = document.getElementById('regGroup').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+
+    if (!name) { showLoginError('请输入昵称'); return; }
+    if (!email) { showLoginError('请输入邮箱'); return; }
+    if (!password || password.length < 4) { showLoginError('密码至少4位'); return; }
+
+    const data = await api('/api/auth/register', {
+        method: 'POST',
+        body: { name, real_name, email, password, group_name, phone }
+    });
+
+    if (data) {
+        showToast('注册成功，已自动登录！');
+        currentUser = data.user;
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+  
+
+=== ALL fetch calls ===
+Line 1870: fetch(API + url, {
+            headers,
+            ...options,
+            body: options.body ? JSON.stringify(options.body)

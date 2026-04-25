@@ -1,0 +1,177 @@
+=== doLogin (line 1926+) ===
+1926: async function doLogin() {
+1927:     const email = document.getElementById('loginEmail').value.trim();
+1928:     const password = document.getElementById('loginPassword').value;
+1929: 
+1930:     if (!email || !password) {
+1931:         showLoginError('请输入邮箱和密码');
+1932:         return;
+1933:     }
+1934: 
+1935:     const data = await api('/api/auth/login', {
+1936:         method: 'POST',
+1937:         body: { email, password }
+1938:     });
+1939: 
+1940:     if (data) {
+1941:         currentUser = data.user;
+1942:         localStorage.setItem('authToken', data.token);
+1943:         localStorage.setItem('currentUser', JSON.stringify(data.user));
+1944:         enterApp();
+1945:     } else {
+1946:         showLoginError('邮箱或密码错误');
+1947:     }
+1948: }
+1949: 
+1950: async function doRegister() {
+1951:     const real_name = document.getElementById('regRealName').value.trim();
+1952:     const name = document.getElementById('regName').value.trim();
+1953:     const email = document.getElementById('regEmail').value.trim();
+1954:     const password = document.getElementById('regPassword').value;
+1955:     const group_name = document.getElementById('regGroup').value.trim();
+1956:     const phone = document.getElementById('regPhone').value.trim();
+1957: 
+1958:     if (!name) { showLoginError('请输入昵称'); return; }
+1959:     if (!email) { showLoginError('请输入邮箱'); return; }
+1960:     if (!password || password.length < 4) { showLoginError('密码至少4位'); return; }
+1961: 
+1962:     const data = await api('/api/auth/register', {
+1963:         method: 'POST',
+1964:         body: { name, real_name, email, password, group_name, phone }
+1965:     });
+1966: 
+1967:     if (data) {
+1968:         showToast('注册成功，已自动登录！');
+1969:         currentUser = data.user;
+1970:         localStorage.setItem('authToken', data.token);
+1971:         localStorage.setItem('currentUser', JSON.stringify(data.user));
+1972:         enterApp();
+1973:     } else {
+1974:         showLoginError('注册失败，可能邮箱已被注册');
+1975:     }
+1976: }
+1977: 
+1978: function doLogout() {
+1979:     currentUser = null;
+1980:     localStorage.removeItem('authToken');
+
+=== Looking for doRegister ===
+1961: 
+1962:     const data = await api('/api/auth/register', {
+1963:         method: 'POST',
+1964:         body: { name, real_name, email, password, group_name, phone }
+1965:     });
+1966: 
+1967:     if (data) {
+1968:         showToast('注册成功，已自动登录！');
+1969:         currentUser = data.user;
+1970:         localStorage.setItem('authToken', data.token);
+1971:         localStorage.setItem('currentUser', JSON.stringify(data.user));
+1972:         enterApp();
+1973:     } else {
+1974:         showLoginError('注册失败，可能邮箱已被注册');
+1975:     }
+1976: }
+1977: 
+1978: function doLogout() {
+1979:     currentUser = null;
+1980:     localStorage.removeItem('authToken');
+1981:     localStorage.removeItem('currentUser');
+1982:     document.getElementById('userDropdown').classList.remove('show');
+1983:     document.getElementById('mainApp').classList.remove('active');
+1984:     document.getElementById('loginPage').style.display = 'flex';
+1985:     // 清空表单
+1986:     document.getElementById('loginEmail').value = '';
+1987:     document.getElementById('loginPassword').value = '';
+1988:     showLogin();
+1989: }
+1990: 
+1991: // ==================== 进入应用 ====================
+1992: function enterApp() {
+1993:     document.getElementById('loginPage').style.display = 'none';
+1994:     document.getElementById('mainApp').classList.add('active');
+1995:     updateUserUI();
+1996:     updateNavTabs();
+1997:     loadCalendar();
+1998: }
+1999: 
+2000: function updateUserUI() {
+2001:     if (!currentUser) return;
+2002:     const name = currentUser.name || '用户';
+2003:     document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+2004:     document.getElementById('navUserName').textContent = name;
+2005:     document.getElementById('ddName').textContent = name;
+2006:     document.getElementById('ddEmail').textContent = currentUser.email || '';
+2007: }
+2008: 
+2009: function updateNavTabs() {
+2010:     const tabs = document.querySelectorAll('#navTabs .nav-tab');
+2011:     tabs.forEach(tab => {
+2012:         const page = tab.dataset.page;
+2013:         if (page === 'users' || page === 'equipment') {
+2014:             tab.style.display = isAdmin() ? '' : 'none';
+2015:         }
+2016:         if (page === 'email') {
+2017:             tab.style.display = isAdmin() ? '' : 'none';
+2018:         }
+2019:     });
+2020: }
+
+=== Login Form HTML (lines 1249-1302) ===
+1249:             <div class="login-form" id="loginForm">
+1250:                 <div class="form-group">
+1251:                     <label>邮箱</label>
+1252:                     <input type="email" id="loginEmail" class="form-control" placeholder="请输入邮箱">
+1253:                 </div>
+1254:                 <div class="form-group">
+1255:                     <label>密码</label>
+1256:                     <div class="password-wrapper">
+1257:                         <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码"
+1258:                                onkeydown="if(event.key==='Enter')doLogin()">
+1259:                         <span class="password-toggle" onclick="togglePassword('loginPassword', this)">👁</span>
+1260:                     </div>
+1261:                 </div>
+1262:                 <button class="login-btn" onclick="doLogin()">登 录</button>
+1263:                 <div class="login-switch">
+1264:                     还没有账号？<a onclick="showRegister()">立即注册</a>
+1265:                 </div>
+1266:             </div>
+1267: 
+1268:             <!-- 注册表单 -->
+1269:             <div class="login-form register-form" id="registerForm">
+1270:                 <div class="form-group">
+1271:                     <label>真实姓名</label>
+1272:                     <input type="text" id="regRealName" class="form-control" placeholder="用于预约显示，实验室其他人可见">
+1273:                 </div>
+1274:                 <div class="form-group">
+1275:                     <label>昵称 *</label>
+1276:                     <input type="text" id="regName" class="form-control" placeholder="请输入昵称（不必真实姓名）">
+1277:                 </div>
+1278:                 <div class="form-group">
+1279:                     <label>邮箱 *</label>
+1280:                     <input type="email" id="regEmail" class="form-control" placeholder="请输入邮箱">
+1281:                 </div>
+1282:                 <div class="form-group">
+1283:                     <label>密码 *</label>
+1284:                     <div class="password-wrapper">
+1285:                         <input type="password" id="regPassword" class="form-control" placeholder="至少4位">
+1286:                         <span class="password-toggle" onclick="togglePassword('regPassword', this)">👁</span>
+1287:                     </div>
+1288:                 </div>
+1289:                 <div class="form-group">
+1290:                     <label>课题组</label>
+1291:                     <input type="text" id="regGroup" class="form-control" placeholder="如：张教授课题组">
+1292:                 </div>
+1293:                 <div class="form-group">
+1294:                     <label>联系电话</label>
+1295:                     <input type="text" id="regPhone" class="form-control" placeholder="手机号">
+1296:                 </div>
+1297:                 <button class="login-btn" onclick="doRegister()">注 册</button>
+1298:                 <div class="login-switch">
+1299:                     已有账号？<a onclick="showLogin()">返回登录</a>
+1300:                 </div>
+1301:             </div>
+1302:         </div>
+1303:     </div>
+
+=== Fetch calls for auth ===

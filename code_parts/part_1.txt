@@ -1,0 +1,200 @@
+1|# -*- coding: utf-8 -*-
+2|"""
+3|实验室超净台预约系统 - 后端服务
+4|Flask + MySQL，提供 RESTful API
+5|支持用户注册/登录、邮件提醒
+6|Deploy: mysql+pymysql
+7|"""
+8|
+9|import os
+10|import re
+11|import json
+12|import hashlib
+13|import secrets
+14|import threading
+15|import smtplib
+16|import pymysql
+17|from pymysql.cursors import DictCursor
+18|from email.mime.text import MIMEText
+19|from email.utils import formataddr
+20|from email.mime.multipart import MIMEMultipart
+21|from datetime import datetime, timedelta
+22|from flask import Flask, jsonify, request, send_from_directory
+23|from flask_cors import CORS
+24|
+25|app = Flask(__name__, static_folder='static', static_url_path='')
+26|CORS(app)
+27|
+28|
+29|# 覆盖 Zeabur 默认的严格 CSP 策略，允许前端 JS 正常运行
+30|@app.after_request
+31|def set_csp(response):
+32|    response.headers['Content-Security-Policy'] = (
+33|        "default-src 'self'; "
+34|        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+35|        "style-src 'self' 'unsafe-inline'; "
+36|        "img-src 'self' data: blob:; "
+37|        "font-src 'self'; "
+38|        "connect-src 'self'"
+39|    )
+40|    return response
+41|
+42|
+43|DATABASE_URL = os.environ.get('DATABASE_URL', '')
+44|
+45|# Zeabur 数据库环境变量（支持 MySQL / MariaDB）
+46|MYSQL_HOST = os.environ.get('MYSQL_HOST', '') or os.environ.get('MARIADB_HOST', '')
+47|MYSQL_PORT = os.environ.get('MYSQL_PORT', '') or os.environ.get('MARIADB_PORT', '3306')
+48|MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '')
+49|MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '')
+50|MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '')
+51|
+52|
+53|# ==================== 数据库工具 ====================
+54|
+55|def get_db_config():
+56|    """获取数据库连接配置，优先用 Zeabur 注入变量，其次解析 DATABASE_URL"""
+57|    if MYSQL_HOST and MYSQL_USERNAME:
+58|        return {
+59|            'host': MYSQL_HOST,
+60|            'port': int(MYSQL_PORT) if MYSQL_PORT else 3306,
+61|            'user': MYSQL_USERNAME,
+62|            'password': MYSQL_PASSWORD,
+63|            'database': MYSQL_DATABASE or 'zeabur',
+64|            'charset': 'utf8mb4',
+65|        }
+66|    if DATABASE_URL:
+67|        import re as _re
+68|        m = _re.match(r'(?:mysql|postgresql|mariadb)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
+69|        if m:
+70|            return {
+71|                'host': m.group(3),
+72|                'port': int(m.group(4) or 3306),
+73|                'user': m.group(1),
+74|                'password': m.group(2),
+75|                'database': m.group(5),
+76|                'charset': 'utf8mb4',
+77|            }
+78|    raise ValueError('未配置数据库连接信息（需要 DATABASE_URL 或 MYSQL_*/MARIADB_* 环境变量）')
+79|
+80|
+81|def get_db():
+82|    """获取数据库连接"""
+83|    params = get_db_config()
+84|    conn = pymysql.connect(**params, cursorclass=DictCursor)
+85|    conn.autocommit(False)
+86|    return conn
+87|
+88|
+89|def query_db(conn, sql, params=(), one=False):
+90|    """执行查询并返回字典列表"""
+91|    with conn.cursor(DictCursor) as cur:
+92|        cur.execute(sql, params)
+93|        if one:
+94|            row = cur.fetchone()
+95|            return dict(row) if row else None
+96|        rows = cur.fetchall()
+97|        return [dict(r) for r in rows]
+98|
+99|
+100|def execute_db(conn, sql, params=()):
+101|    """执行写操作，返回 cursor"""
+102|    cur = conn.cursor()
+103|    cur.execute(sql, params)
+104|    return cur
+105|
+106|
+107|def init_db():
+108|    """初始化数据库表"""
+109|    conn = get_db()
+110|
+111|    with conn.cursor() as cur:
+112|        cur.execute('''
+113|            CREATE TABLE IF NOT EXISTS equipment (
+114|                id INT AUTO_INCREMENT PRIMARY KEY,
+115|                name VARCHAR(255) NOT NULL,
+116|                location VARCHAR(255) DEFAULT '',
+117|                status VARCHAR(50) DEFAULT 'available',
+118|                description TEXT,
+119|                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+120|            )
+121|        ''')
+122|
+123|        cur.execute('''
+124|            CREATE TABLE IF NOT EXISTS users (
+125|                id INT AUTO_INCREMENT PRIMARY KEY,
+126|                name VARCHAR(255) NOT NULL,
+127|                real_name VARCHAR(255) DEFAULT '',
+128|                email VARCHAR(255) UNIQUE,
+129|                password_hash VARCHAR(255) NOT NULL,
+130|                group_name VARCHAR(255) DEFAULT '',
+131|                phone VARCHAR(50) DEFAULT '',
+132|                role VARCHAR(50) DEFAULT 'user',
+133|                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+134|            )
+135|        ''')
+136|
+137|        cur.execute('''
+138|            CREATE TABLE IF NOT EXISTS bookings (
+139|                id INT AUTO_INCREMENT PRIMARY KEY,
+140|                equipment_id INT NOT NULL,
+141|                user_id INT NOT NULL,
+142|                date VARCHAR(20) NOT NULL,
+143|                start_time VARCHAR(10) NOT NULL,
+144|                end_time VARCHAR(10) NOT NULL,
+145|                purpose TEXT,
+146|                status VARCHAR(50) DEFAULT 'active',
+147|                reminder_sent TINYINT DEFAULT 0,
+148|                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+149|                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+150|                FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+151|                FOREIGN KEY (user_id) REFERENCES users(id)
+152|            )
+153|        ''')
+154|
+155|        cur.execute('''
+156|            CREATE TABLE IF NOT EXISTS email_config (
+157|                id INT AUTO_INCREMENT PRIMARY KEY,
+158|                smtp_host VARCHAR(255) NOT NULL,
+159|                smtp_port INT DEFAULT 465,
+160|                smtp_user VARCHAR(255) NOT NULL,
+161|                smtp_pass TEXT,
+162|                use_ssl TINYINT DEFAULT 1,
+163|                sender_name VARCHAR(255) DEFAULT '超净台预约系统',
+164|                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+165|            )
+166|        ''')
+167|
+168|    conn.commit()
+169|
+170|    # 插入默认设备（如果表为空）
+171|    with conn.cursor() as cur:
+172|        cur.execute('SELECT COUNT(*) as cnt FROM equipment')
+173|        if cur.fetchone()['cnt'] == 0:
+174|            for name, loc, desc in [
+175|                ('超净台 1号', '实验室 A101', '左侧标准超净台'),
+176|                ('超净台 2号', '实验室 A101', '右侧标准超净台'),
+177|                ('超净台 3号', '实验室 A102', '生物安全柜'),
+178|            ]:
+179|                cur.execute(
+180|                    'INSERT INTO equipment (name, location, description) VALUES (%s, %s, %s)',
+181|                    (name, loc, desc)
+182|                )
+183|            conn.commit()
+184|
+185|    # 插入默认管理员（如果表为空）
+186|    with conn.cursor() as cur:
+187|        cur.execute('SELECT COUNT(*) as cnt FROM users')
+188|        if cur.fetchone()['cnt'] == 0:
+189|            pw_hash = hash_password('admin123')
+190|            cur.execute(
+191|                'INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)',
+192|                ('管理员', 'admin@lab.local', pw_hash, 'admin')
+193|            )
+194|            conn.commit()
+195|
+196|    conn.close()
+197|
+198|
+199|# ==================== 密码工具 ====================
+200|

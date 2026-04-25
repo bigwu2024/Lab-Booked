@@ -1,0 +1,200 @@
+801|        SELECT b.id, e.name as equip_name
+802|        FROM bookings b
+803|        JOIN equipment e ON b.equipment_id = e.id
+804|        WHERE b.user_id = %s
+805|          AND b.date = %s
+806|          AND b.status = 'active'
+807|          AND b.start_time < %s
+808|          AND b.end_time > %s
+809|    ''', (data['user_id'], data['date'], data['end_time'], data['start_time']), one=True)
+810|
+811|    if same_user_conflict:
+812|        conn.close()
+813|        return jsonify({
+814|            'error': '时间冲突',
+815|            'detail': f"你在 {data['start_time']}-{data['end_time']} 已经预约了 {same_user_conflict['equip_name']}"
+816|        }), 409
+817|
+818|    cur = execute_db(conn, '''
+819|        INSERT INTO bookings (equipment_id, user_id, date, start_time, end_time, purpose)
+820|        VALUES (%s, %s, %s, %s, %s, %s)
+821|    ''', (
+822|        data['equipment_id'], data['user_id'], data['date'],
+823|        data['start_time'], data['end_time'], data.get('purpose', '')
+824|    ))
+825|    conn.commit()
+826|    booking_id = cur.lastrowid
+827|    cur.close()
+828|
+829|    # 发送预约成功邮件通知
+830|    user = query_db(conn, 'SELECT name, email FROM users WHERE id = %s', (data['user_id'],), one=True)
+831|    equip = query_db(conn, 'SELECT name FROM equipment WHERE id = %s', (data['equipment_id'],), one=True)
+832|    if user and equip:
+833|        send_booking_created(
+834|            user['name'], user['email'], equip['name'],
+835|            data['date'], data['start_time'], data['end_time'], data.get('purpose', '')
+836|        )
+837|
+838|    conn.close()
+839|
+840|    return jsonify({'id': booking_id, 'message': '预约成功'}), 201
+841|
+842|
+843|@app.route('/api/bookings/<int:bid>', methods=['PUT'])
+844|def update_booking(bid):
+845|    """更新预约"""
+846|    data = request.json
+847|    conn = get_db()
+848|
+849|    # 冲突检测（排除自身）
+850|    conflict = query_db(conn, '''
+851|        SELECT b.id, e.name as equip_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, b.start_time, b.end_time
+852|        FROM bookings b
+853|        JOIN equipment e ON b.equipment_id = e.id
+854|        JOIN users u ON b.user_id = u.id
+855|        WHERE b.equipment_id = %s
+856|          AND b.date = %s
+857|          AND b.status = 'active'
+858|          AND b.start_time < %s
+859|          AND b.end_time > %s
+860|          AND b.id != %s
+861|    ''', (data.get('equipment_id'), data.get('date'),
+862|          data['end_time'], data['start_time'], bid), one=True)
+863|
+864|    if conflict:
+865|        conn.close()
+866|        return jsonify({
+867|            'error': '时间冲突',
+868|            'detail': f"{conflict['equip_name']} 在 {conflict['start_time']}-{conflict['end_time']} 已被 {conflict['user_name']} 预约"
+869|        }), 409
+870|
+871|    execute_db(conn, '''
+872|        UPDATE bookings SET
+873|            equipment_id=%s, date=%s, start_time=%s, end_time=%s,
+874|            purpose=%s, status=%s, updated_at=CURRENT_TIMESTAMP
+875|        WHERE id=%s
+876|    ''', (
+877|        data.get('equipment_id'), data.get('date'),
+878|        data['start_time'], data['end_time'],
+879|        data.get('purpose', ''), data.get('status', 'active'), bid
+880|    ))
+881|    conn.commit()
+882|    conn.close()
+883|    return jsonify({'message': '预约更新成功'})
+884|
+885|
+886|@app.route('/api/bookings/<int:bid>', methods=['DELETE'])
+887|def cancel_booking(bid):
+888|    """取消预约"""
+889|    conn = get_db()
+890|
+891|    # 先获取预约信息用于发送邮件
+892|    booking = query_db(conn, '''
+893|        SELECT b.date, b.start_time, b.end_time, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.email, e.name as equip_name
+894|        FROM bookings b
+895|        JOIN users u ON b.user_id = u.id
+896|        JOIN equipment e ON b.equipment_id = e.id
+897|        WHERE b.id = %s AND b.status = 'active'
+898|    ''', (bid,), one=True)
+899|
+900|    execute_db(conn,
+901|        "UPDATE bookings SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=%s",
+902|        (bid,)
+903|    )
+904|    conn.commit()
+905|
+906|    # 发送取消通知邮件
+907|    if booking and booking['email']:
+908|        send_booking_cancelled(
+909|            booking['user_name'], booking['email'], booking['equip_name'],
+910|            booking['date'], booking['start_time'], booking['end_time']
+911|        )
+912|
+913|    conn.close()
+914|    return jsonify({'message': '预约已取消'})
+915|
+916|
+917|# ==================== 统计 API ====================
+918|
+919|@app.route('/api/stats', methods=['GET'])
+920|def get_stats():
+921|    """获取预约统计数据"""
+922|    conn = get_db()
+923|
+924|    with conn.cursor() as cur:
+925|        cur.execute("SELECT COUNT(*) as cnt FROM bookings WHERE status='active'")
+926|        total_bookings = cur.fetchone()['cnt']
+927|
+928|        today = datetime.now().strftime('%Y-%m-%d')
+929|        cur.execute("SELECT COUNT(*) as cnt FROM bookings WHERE date=%s AND status='active'", (today,))
+930|        today_bookings = cur.fetchone()['cnt']
+931|
+932|        cur.execute('SELECT COUNT(*) as cnt FROM equipment')
+933|        total_equipment = cur.fetchone()['cnt']
+934|
+935|        cur.execute('SELECT COUNT(*) as cnt FROM users')
+936|        total_users = cur.fetchone()['cnt']
+937|
+938|    # 近7天每天预约数
+939|    week_stats = []
+940|    for i in range(6, -1, -1):
+941|        d = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+942|        with conn.cursor() as cur:
+943|            cur.execute("SELECT COUNT(*) as cnt FROM bookings WHERE date=%s AND status='active'", (d,))
+944|            count = cur.fetchone()['cnt']
+945|        week_stats.append({'date': d, 'count': count})
+946|
+947|    # 各设备使用率（近7天）
+948|    equipment_usage = query_db(conn, '''
+949|        SELECT e.id, e.name, COUNT(b.id) as booking_count
+950|        FROM equipment e
+951|        LEFT JOIN bookings b ON e.id = b.equipment_id
+952|            AND b.date >= %s AND b.date <= %s AND b.status = 'active'
+953|        GROUP BY e.id
+954|        ORDER BY booking_count DESC
+955|    ''', (
+956|        (datetime.now() - timedelta(days=6)).strftime('%Y-%m-%d'),
+957|        today
+958|    ))
+959|
+960|    conn.close()
+961|
+962|    return jsonify({
+963|        'total_bookings': total_bookings,
+964|        'today_bookings': today_bookings,
+965|        'total_equipment': total_equipment,
+966|        'total_users': total_users,
+967|        'week_stats': week_stats,
+968|        'equipment_usage': equipment_usage
+969|    })
+970|
+971|
+972|# ==================== 调试 API ====================
+973|
+974|@app.route('/api/debug/db', methods=['GET'])
+975|def debug_db():
+976|    """检查数据库连接和表状态"""
+977|    try:
+978|        config = get_db_config()
+979|        conn = pymysql.connect(**config, cursorclass=DictCursor)
+980|        with conn.cursor() as cur:
+981|            cur.execute("SHOW TABLES")
+982|            tables = [list(r.values())[0] for r in cur.fetchall()]
+983|            result = {'connected': True, 'host': config['host'], 'tables': tables}
+984|
+985|            if 'users' in tables:
+986|                cur.execute("SELECT COUNT(*) as cnt FROM users")
+987|                result['user_count'] = cur.fetchone()['cnt']
+988|                cur.execute("SELECT id, name, email, role FROM users LIMIT 5")
+989|                result['users'] = [dict(r) for r in cur.fetchall()]
+990|
+991|            if 'equipment' in tables:
+992|                cur.execute("SELECT COUNT(*) as cnt FROM equipment")
+993|                result['equipment_count'] = cur.fetchone()['cnt']
+994|
+995|        conn.close()
+996|        return jsonify(result)
+997|    except Exception as e:
+998|        return jsonify({'connected': False, 'error': str(e)})
+999|
+1000|

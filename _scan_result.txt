@@ -1,0 +1,76 @@
+4: Flask + MySQL，提供 RESTful API
+6: Deploy: mysql+pymysql
+9: import os
+10: import re
+11: import json
+12: import hashlib
+13: import secrets
+14: import threading
+15: import smtplib
+16: import pymysql
+17: from pymysql.cursors import DictCursor
+18: from email.mime.text import MIMEText
+19: from email.utils import formataddr
+20: from email.mime.multipart import MIMEMultipart
+21: from datetime import datetime, timedelta
+22: from flask import Flask, jsonify, request, send_from_directory
+23: from flask_cors import CORS
+43: DATABASE_URL = os.environ.get('DATABASE_URL', '')
+45: # Zeabur 数据库环境变量（支持 MySQL / MariaDB）
+46: MYSQL_HOST = os.environ.get('MYSQL_HOST', '') or os.environ.get('MARIADB_HOST', '')
+47: MYSQL_PORT = os.environ.get('MYSQL_PORT', '') or os.environ.get('MARIADB_PORT', '3306')
+48: MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '')
+49: MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '')
+50: MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '')
+55: def get_db_config():
+56:     """获取数据库连接配置，优先用 Zeabur 注入变量，其次解析 DATABASE_URL"""
+57:     if MYSQL_HOST and MYSQL_USERNAME:
+59:             'host': MYSQL_HOST,
+60:             'port': int(MYSQL_PORT) if MYSQL_PORT else 3306,
+61:             'user': MYSQL_USERNAME,
+62:             'password': MYSQL_PASSWORD,
+63:             'database': MYSQL_DATABASE or 'zeabur',
+66:     if DATABASE_URL:
+67:         import re as _re
+68:         m = _re.match(r'(?:mysql|postgresql|mariadb)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
+78:     raise ValueError('未配置数据库连接信息（需要 DATABASE_URL 或 MYSQL_*/MARIADB_* 环境变量）')
+81: def get_db():
+83:     params = get_db_config()
+84:     conn = pymysql.connect(**params, cursorclass=DictCursor)
+91:     with conn.cursor(DictCursor) as cur:
+101:     """执行写操作，返回 cursor"""
+102:     cur = conn.cursor()
+109:     conn = get_db()
+111:     with conn.cursor() as cur:
+171:     with conn.cursor() as cur:
+186:     with conn.cursor() as cur:
+211:         conn = get_db()
+223:     conn = get_db()
+271:         import traceback
+380:     conn = get_db()
+430:     conn = get_db()
+439:     with conn.cursor() as cur:
+444:     with conn.cursor() as cur:
+472:     conn = get_db()
+499:     conn = get_db()
+535:     conn = get_db()
+600:     conn = get_db()
+610:     conn = get_db()
+626:     conn = get_db()
+640:     conn = get_db()
+661:     conn = get_db()
+671:     conn = get_db()
+685:     conn = get_db()
+712:     conn = get_db()
+755:     conn = get_db()
+777:     conn = get_db()
+847:     conn = get_db()
+889:     conn = get_db()
+922:     conn = get_db()
+924:     with conn.cursor() as cur:
+942:         with conn.cursor() as cur:
+978:         config = get_db_config()
+979:         conn = pymysql.connect(**config, cursorclass=DictCursor)
+980:         with conn.cursor() as cur:
+1028:     import time
+1042: if DATABASE_URL or (MYSQL_HOST and MYSQL_USERNAME):

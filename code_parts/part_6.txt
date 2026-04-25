@@ -1,0 +1,65 @@
+1001|# ==================== 前端路由 ====================
+1002|
+1003|@app.route('/')
+1004|def index():
+1005|    return send_from_directory('static', 'index.html')
+1006|
+1007|
+1008|# ==================== 启动 ====================
+1009|
+1010|_db_initialized = False
+1011|
+1012|def _ensure_db():
+1013|    """确保数据库已初始化，在首次 API 请求时触发"""
+1014|    global _db_initialized
+1015|    if _db_initialized:
+1016|        return True
+1017|    try:
+1018|        init_db()
+1019|        _db_initialized = True
+1020|        print("[启动] 数据库初始化成功")
+1021|        return True
+1022|    except Exception as e:
+1023|        print(f"[启动] 数据库初始化失败: {e}")
+1024|        return False
+1025|
+1026|def _delayed_init():
+1027|    """启动时尝试初始化数据库，最多重试10次"""
+1028|    import time
+1029|    for i in range(10):
+1030|        try:
+1031|            init_db()
+1032|            global _db_initialized
+1033|            _db_initialized = True
+1034|            print(f"[启动] 数据库初始化成功（第{i+1}次尝试）")
+1035|            return True
+1036|        except Exception as e:
+1037|            print(f"[启动] 数据库初始化失败（第{i+1}次）: {e}")
+1038|            time.sleep(5)
+1039|    return False
+1040|
+1041|# 启动时尝试初始化（如果配置了数据库）
+1042|if DATABASE_URL or (MYSQL_HOST and MYSQL_USERNAME):
+1043|    _delayed_init()
+1044|
+1045|# 首次请求时自动初始化数据库（兜底）
+1046|@app.before_request
+1047|def before_request_hook():
+1048|    _ensure_db()
+1049|
+1050|# 启动邮件提醒后台线程
+1051|t = threading.Thread(target=reminder_loop, daemon=True)
+1052|t.start()
+1053|
+1054|if __name__ == '__main__':
+1055|    print("=" * 50)
+1056|    print("  实验室超净台预约系统")
+1057|    print("=" * 50)
+1058|
+1059|    # Zeabur 部署支持：使用环境变量 PORT，host=0.0.0.0，生产环境关闭 debug
+1060|    port = int(os.environ.get('PORT', 5000))
+1061|    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+1062|    print(f"  访问地址: http://0.0.0.0:{port}")
+1063|    print(f"  默认管理员: admin@lab.local / admin123")
+1064|    print(f"  Debug 模式: {'开启' if debug else '关闭'}")
+1065|    app.run(host='0.0.0.0', port=port, debug=debug)

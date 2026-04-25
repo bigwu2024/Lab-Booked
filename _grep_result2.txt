@@ -1,0 +1,251 @@
+1890:     if (!container) return;
+1891:     const toast = document.createElement('div');
+1892:     toast.className = `toast ${type}`;
+1893:     const icons = { success: '✅', error: '❌', warning: '⚠️' };
+1894:     toast.innerHTML = `<span>${icons[type] || ''}</span> ${msg}`;
+1895:     container.appendChild(toast);
+1896:     setTimeout(() => toast.remove(), 3000);
+1897: }
+1898: 
+1899: function closeModal(id) {
+1900:     document.getElementById(id).classList.remove('show');
+1901: }
+1902: 
+1903: // ==================== 登录 / 注册 ====================
+1904: function showLogin() {
+1905:     document.getElementById('loginForm').style.display = 'block';
+1906:     document.getElementById('registerForm').style.display = 'none';
+1907:     document.getElementById('authTitle').textContent = '欢迎登录';
+1908:     document.getElementById('authSubtitle').textContent = '请输入你的账号信息';
+1909:     document.getElementById('loginError').style.display = 'none';
+1910: }
+1911: 
+1912: function showRegister() {
+1913:     document.getElementById('loginForm').style.display = 'none';
+1914:     document.getElementById('registerForm').style.display = 'block';
+1915:     document.getElementById('authTitle').textContent = '注册账号';
+1916:     document.getElementById('authSubtitle').textContent = '填写信息创建新账号';
+1917:     document.getElementById('loginError').style.display = 'none';
+1918: }
+1919: 
+1920: function showLoginError(msg) {
+1921:     const el = document.getElementById('loginError');
+1922:     el.textContent = msg;
+1923:     el.style.display = 'block';
+1924: }
+1925: 
+1926: async function doLogin() {
+1927:     const email = document.getElementById('loginEmail').value.trim();
+1928:     const password = document.getElementById('loginPassword').value;
+1929: 
+1930:     if (!email || !password) {
+1931:         showLoginError('请输入邮箱和密码');
+1932:         return;
+1933:     }
+1934: 
+1935:     const data = await api('/api/auth/login', {
+1936:         method: 'POST',
+1937:         body: { email, password }
+1938:     });
+1939: 
+1940:     if (data) {
+1941:         currentUser = data.user;
+1942:         localStorage.setItem('authToken', data.token);
+1943:         localStorage.setItem('currentUser', JSON.stringify(data.user));
+1944:         enterApp();
+1945:     } else {
+1946:         showLoginError('邮箱或密码错误');
+1947:     }
+1948: }
+1949: 
+1950: async function doRegister() {
+1951:     const real_name = document.getElementById('regRealName').value.trim();
+1952:     const name = document.getElementById('regName').value.trim();
+1953:     const email = document.getElementById('regEmail').value.trim();
+1954:     const password = document.getElementById('regPassword').value;
+1955:     const group_name = document.getElementById('regGroup').value.trim();
+1956:     const phone = document.getElementById('regPhone').value.trim();
+1957: 
+1958:     if (!name) { showLoginError('请输入昵称'); return; }
+1959:     if (!email) { showLoginError('请输入邮箱'); return; }
+1960:     if (!password || password.length < 4) { showLoginError('密码至少4位'); return; }
+1961: 
+1962:     const data = await api('/api/auth/register', {
+1963:         method: 'POST',
+1964:         body: { name, real_name, email, password, group_name, phone }
+1965:     });
+1966: 
+1967:     if (data) {
+1968:         showToast('注册成功，已自动登录！');
+1969:         currentUser = data.user;
+1970:         localStorage.setItem('authToken', data.token);
+1971:         localStorage.setItem('currentUser', JSON.stringify(data.user));
+1972:         enterApp();
+1973:     } else {
+1974:         showLoginError('注册失败，可能邮箱已被注册');
+1975:     }
+1976: }
+1977: 
+1978: function doLogout() {
+1979:     currentUser = null;
+1980:     localStorage.removeItem('authToken');
+1981:     localStorage.removeItem('currentUser');
+1982:     document.getElementById('userDropdown').classList.remove('show');
+1983:     document.getElementById('mainApp').classList.remove('active');
+1984:     document.getElementById('loginPage').style.display = 'flex';
+1985:     // 清空表单
+1986:     document.getElementById('loginEmail').value = '';
+1987:     document.getElementById('loginPassword').value = '';
+1988:     showLogin();
+1989: }
+1990: 
+1991: // ==================== 进入应用 ====================
+1992: function enterApp() {
+1993:     document.getElementById('loginPage').style.display = 'none';
+1994:     document.getElementById('mainApp').classList.add('active');
+1995:     updateUserUI();
+1996:     updateNavTabs();
+1997:     loadCalendar();
+1998: }
+1999: 
+2000: function updateUserUI() {
+2001:     if (!currentUser) return;
+2002:     const name = currentUser.name || '用户';
+2003:     document.getElementById('userAvatar').textContent = name.charAt(0).toUpperCase();
+2004:     document.getElementById('navUserName').textContent = name;
+2005:     document.getElementById('ddName').textContent = name;
+2006:     document.getElementById('ddEmail').textContent = currentUser.email || '';
+2007: }
+2008: 
+2009: function updateNavTabs() {
+2010:     const tabs = document.querySelectorAll('#navTabs .nav-tab');
+
+
+=== BUTTON/FORM SEARCH ===
+
+BUTTON (line 1262): <button class="login-btn" onclick="doLogin()">登 录</button>
+
+BUTTON (line 1297): <button class="login-btn" onclick="doRegister()">注 册</button>
+
+BUTTON (line 1325): <button class="nav-tab active" data-page="calendar" onclick="switchPage('calendar')">📅 预约日历</button>
+
+BUTTON (line 1326): <button class="nav-tab" data-page="bookings" onclick="switchPage('bookings')">📋 预约记录</button>
+
+BUTTON (line 1327): <button class="nav-tab" data-page="equipment" onclick="switchPage('equipment')">🔬 设备管理</button>
+
+BUTTON (line 1328): <button class="nav-tab" data-page="users" onclick="switchPage('users')">👥 用户管理</button>
+
+BUTTON (line 1329): <button class="nav-tab" data-page="email" onclick="switchPage('email')">📧 邮件设置</button>
+
+BUTTON (line 1378): <button class="btn" onclick="changeWeek(-1)">◀ 上一周</button>
+
+BUTTON (line 1380): <button class="btn" onclick="changeWeek(1)">下一周 ▶</button>
+
+BUTTON (line 1381): <button class="btn" onclick="goToday()">今天</button>
+
+BUTTON (line 1383): <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
+
+BUTTON (line 1408): <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
+
+BUTTON (line 1434): <button class="btn btn-primary" onclick="openEquipmentModal()">＋ 添加设备</button>
+
+BUTTON (line 1519): <button class="btn btn-primary" onclick="saveEmailConfig()" style="width:100%;justify-content:center;">
+                        💾 保存配置
+                    </button>
+
+BUTTON (line 1530): <button class="btn btn-primary" onclick="sendTestEmail()" style="width:100%;justify-content:center;">
+                        📤 发送测试邮件
+                    </button>
+
+BUTTON (line 1568): <button class="mobile-nav-item active" data-page="calendar" onclick="switchPage('calendar')">
+
+                <span class="m-icon">📅</span>
+
+                <span class="m-label">预约日历</span>
+
+       
+
+BUTTON (line 1576): <button class="mobile-nav-item" data-page="bookings" onclick="switchPage('bookings')">
+
+                <span class="m-icon">📋</span>
+
+                <span class="m-label">预约记录</span>
+
+            </
+
+BUTTON (line 1584): <button class="mobile-nav-item" data-page="equipment" onclick="switchPage('equipment')">
+
+                <span class="m-icon">🔬</span>
+
+                <span class="m-label">设备</span>
+
+            </
+
+BUTTON (line 1592): <button class="mobile-nav-item" data-page="users" onclick="switchPage('users')">
+
+                <span class="m-icon">👥</span>
+
+                <span class="m-label">用户</span>
+
+            </button>
+
+BUTTON (line 1600): <button class="mobile-nav-item" onclick="toggleUserMenu()">
+
+                <span class="m-icon">⚙️</span>
+
+                <span class="m-label">更多</span>
+
+            </button>
+
+BUTTON (line 1619): <button class="modal-close" onclick="closeModal('bookingModal')">✕</button>
+
+BUTTON (line 1653): <button class="btn" onclick="closeModal('bookingModal')">取消</button>
+
+BUTTON (line 1654): <button class="btn btn-primary" onclick="saveBooking()">确认预约</button>
+
+BUTTON (line 1664): <button class="modal-close" onclick="closeModal('equipmentModal')">✕</button>
+
+BUTTON (line 1690): <button class="btn" onclick="closeModal('equipmentModal')">取消</button>
+
+BUTTON (line 1691): <button class="btn btn-primary" onclick="saveEquipment()">保存</button>
+
+BUTTON (line 1701): <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+
+BUTTON (line 1730): <button class="btn" onclick="closeModal('userModal')">取消</button>
+
+BUTTON (line 1731): <button class="btn btn-primary" onclick="saveUser()">保存</button>
+
+BUTTON (line 1741): <button class="modal-close" onclick="closeModal('profileModal')">✕</button>
+
+BUTTON (line 1766): <button class="btn" onclick="closeModal('profileModal')">取消</button>
+
+BUTTON (line 1767): <button class="btn btn-primary" onclick="saveProfile()">保存</button>
+
+BUTTON (line 1777): <button class="modal-close" onclick="closeModal('passwordModal')">✕</button>
+
+BUTTON (line 1803): <button class="btn" onclick="closeModal('passwordModal')">取消</button>
+
+BUTTON (line 1804): <button class="btn btn-primary" onclick="changePassword()">确认修改</button>
+
+BUTTON (line 2338): <button class="btn btn-sm" onclick="editBooking(${b.id})">编辑</button>
+
+BUTTON (line 2339): <button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">取消</button>
+
+BUTTON (line 2471): <button class="btn btn-sm" onclick="editEquipment(${e.id})">编辑</button>
+
+BUTTON (line 2472): <button class="btn btn-sm btn-danger" onclick="deleteEquipment(${e.id})">删除</button>
+
+BUTTON (line 2553): <button class="btn btn-sm" onclick="editUser(${u.id})">编辑</button>
+
+BUTTON (line 2554): <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">删除</button>
+
+FORM (line 1249): <div class="login-form" id="loginForm">
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" id="loginEmail" class="form-control" placeholder="请输入邮箱">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码"
+                       

@@ -1,0 +1,200 @@
+201|def hash_password(password):
+202|    """SHA-256 哈希密码"""
+203|    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+204|
+205|
+206|# ==================== 邮件配置 ====================
+207|
+208|def load_email_config():
+209|    """从数据库加载邮件配置"""
+210|    try:
+211|        conn = get_db()
+212|        rows = query_db(conn, 'SELECT * FROM email_config ORDER BY id DESC LIMIT 1')
+213|        conn.close()
+214|        if rows:
+215|            return rows[0]
+216|    except Exception:
+217|        pass
+218|    return None
+219|
+220|
+221|def save_email_config(config):
+222|    """保存邮件配置到数据库"""
+223|    conn = get_db()
+224|    # 清除旧配置，只保留一条
+225|    execute_db(conn, 'DELETE FROM email_config')
+226|    execute_db(conn, '''
+227|        INSERT INTO email_config (smtp_host, smtp_port, smtp_user, smtp_pass, use_ssl, sender_name)
+228|        VALUES (%s, %s, %s, %s, %s, %s)
+229|    ''', (
+230|        config['smtp_host'], config.get('smtp_port', 465),
+231|        config['smtp_user'], config.get('smtp_pass', ''),
+232|        1 if config.get('use_ssl', True) else 0, config.get('sender_name', '超净台预约系统')
+233|    ))
+234|    conn.commit()
+235|    conn.close()
+236|
+237|
+238|def send_email(to_email, subject, html_body):
+239|    """发送邮件"""
+240|    config = load_email_config()
+241|    if not config:
+242|        print(f"[邮件] 未配置邮箱，跳过发送到 {to_email}")
+243|        return False, '邮件未配置'
+244|
+245|    try:
+246|        msg = MIMEMultipart('alternative')
+247|        msg['From'] = formataddr((config.get('sender_name', '超净台预约系统'), config['smtp_user']))
+248|        msg['To'] = to_email
+249|        msg['Subject'] = subject
+250|
+251|        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+252|
+253|        smtp_host = config['smtp_host']
+254|        smtp_port = config.get('smtp_port', 465)
+255|        smtp_user = config['smtp_user']
+256|        print(f'[邮件] 正在连接 {smtp_host}:{smtp_port} (SSL={config.get("use_ssl", True)})')
+257|        print(f'[邮件] 登录账号: {smtp_user}')
+258|
+259|        if config.get('use_ssl', True):
+260|            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
+261|        else:
+262|            server = smtplib.SMTP(config['smtp_host'], config.get('smtp_port', 587), timeout=10)
+263|            server.starttls()
+264|
+265|        server.login(config['smtp_user'], config['smtp_pass'])
+266|        server.sendmail(config['smtp_user'], to_email, msg.as_string())
+267|        server.quit()
+268|        print(f"[邮件] 已发送到 {to_email}: {subject}")
+269|        return True, None
+270|    except Exception as e:
+271|        import traceback
+272|        err_msg = f"{type(e).__name__}: {e}"
+273|        print(f"[邮件] 发送失败: {err_msg}")
+274|        traceback.print_exc()
+275|        return False, err_msg
+276|
+277|
+278|def make_email_html(title, title_color, greeting, description, rows, footer=''):
+279|    """通用邮件模板"""
+280|    rows_html = ''.join(
+281|        f'<tr><td style="padding:10px;background:#f0f2f5;font-weight:600;border-radius:8px 0 0 0;">{r[0]}</td>'
+282|        f'<td style="padding:10px;background:#f0f2f5;border-radius:0 8px 0 0;">{r[1]}</td></tr>'
+283|        if i == 0 else
+284|        f'<tr><td style="padding:10px;background:#f8fafc;font-weight:600;">{r[0]}</td>'
+285|        f'<td style="padding:10px;background:#f8fafc;">{r[1]}</td></tr>'
+286|        for i, r in enumerate(rows)
+287|    )
+288|    return f"""
+289|    <div style="max-width:500px;margin:0 auto;font-family:-apple-system,'Microsoft YaHei',sans-serif;">
+290|        <div style="background:linear-gradient(135deg,{title_color});padding:24px;border-radius:12px 12px 0 0;">
+291|            <h2 style="color:white;margin:0;">{title}</h2>
+292|        </div>
+293|        <div style="background:white;padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;">
+294|            <p style="font-size:16px;">{greeting}</p>
+295|            <p style="color:#6b7280;">{description}</p>
+296|            <table style="width:100%;margin:16px 0;border-collapse:collapse;">{rows_html}</table>
+297|            {footer}
+298|            <p style="color:#9ca3af;font-size:12px;border-top:1px solid #f0f0f0;padding-top:12px;margin-top:12px;">
+299|                贵州医科大学生物工程学院 · 超净台预约系统<br>
+300|                此邮件由系统自动发送，请勿回复。
+301|            </p>
+302|        </div>
+303|    </div>
+304|    """
+305|
+306|
+307|def send_booking_created(user_name, user_email, equipment_name, date, start_time, end_time, purpose):
+308|    """预约创建成功通知"""
+309|    if not user_email:
+310|        return
+311|    rows = [
+312|        ('📅 日期', date),
+313|        ('⏰ 时间', f'{start_time} - {end_time}'),
+314|        ('🔬 设备', equipment_name),
+315|    ]
+316|    if purpose:
+317|        rows.append(('📝 用途', purpose))
+318|    html = make_email_html(
+319|        '🎉 预约成功！', '#22c55e,#16a34a',
+320|        f'<strong>{user_name}</strong>，好消息！',
+321|        '你的超净台已经就位，就等你来了：', rows
+322|    )
+323|    send_email(user_email, f'[预约成功] {date} {start_time}-{end_time} {equipment_name}', html)
+324|
+325|
+326|def send_booking_cancelled(user_name, user_email, equipment_name, date, start_time, end_time):
+327|    """预约取消通知"""
+328|    if not user_email:
+329|        return
+330|    html = make_email_html(
+331|        '👋 预约已取消', '#ef4444,#dc2626',
+332|        f'<strong>{user_name}</strong>，你的预约已取消',
+333|        '以下时间段已释放，其他人可以预约了：',
+334|        [
+335|            ('📅 日期', date),
+336|            ('⏰ 时间', f'{start_time} - {end_time}'),
+337|            ('🔬 设备', equipment_name),
+338|        ]
+339|    )
+340|    send_email(user_email, f'[已取消] {date} {start_time}-{end_time} {equipment_name}', html)
+341|
+342|
+343|def send_booking_reminder(user_name, user_email, equipment_name, date, start_time, end_time, purpose):
+344|    """发送预约提醒邮件（开始前15分钟）"""
+345|    if not user_email:
+346|        return
+347|    rows = [
+348|        ('📅 日期', date),
+349|        ('⏰ 时间', f'{start_time} - {end_time}'),
+350|        ('🔬 设备', equipment_name),
+351|    ]
+352|    if purpose:
+353|        rows.append(('📝 用途', purpose))
+354|    html = make_email_html(
+355|        '⏰ 马上就到啦！', '#4f6ef7,#3a54d4',
+356|        f'<strong>{user_name}</strong>，准备出发！',
+357|        '你的超净台预约 15 分钟后开始，别忘了穿好实验服：', rows
+358|    )
+359|    send_email(user_email, f'[即将开始] {date} {start_time} {equipment_name}', html)
+360|
+361|
+362|# ==================== 定时邮件检查 ====================
+363|
+364|def reminder_loop():
+365|    """后台线程：每分钟检查并发送即将开始的预约提醒"""
+366|    while True:
+367|        try:
+368|            check_and_send_reminders()
+369|        except Exception as e:
+370|            print(f"[提醒] 检查出错: {e}")
+371|        threading.Event().wait(60)  # 每60秒检查一次
+372|
+373|
+374|def check_and_send_reminders():
+375|    """检查未来15分钟内开始且未发送过提醒的预约"""
+376|    config = load_email_config()
+377|    if not config:
+378|        return  # 未配置邮件，跳过
+379|
+380|    conn = get_db()
+381|    now = datetime.now()
+382|    today = now.strftime('%Y-%m-%d')
+383|    current_time = now.strftime('%H:%M')
+384|
+385|    bookings = query_db(conn, '''
+386|        SELECT b.id, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.email, e.name as equipment_name,
+387|               b.date, b.start_time, b.end_time, b.purpose, b.reminder_sent
+388|        FROM bookings b
+389|        JOIN users u ON b.user_id = u.id
+390|        JOIN equipment e ON b.equipment_id = e.id
+391|        WHERE b.date = %s
+392|          AND b.status = 'active'
+393|          AND b.reminder_sent = 0
+394|          AND b.start_time >= %s
+395|          AND b.start_time <= %s
+396|    ''', (today, current_time, (now + timedelta(minutes=15)).strftime('%H:%M')))
+397|
+398|    for b in bookings:
+399|        send_booking_reminder(
+400|            b['user_name'], b['email'], b['equipment_name'],

@@ -1,0 +1,143 @@
+41:         /* ==================== 登录页 ==================== */
+42:         .login-page {
+50:         .login-card {
+60:         .login-left {
+71:         .login-left::before {
+79:         .login-left::after {
+87:         .login-left h1 {
+94:         .login-left p {
+101:         .login-left .features {
+106:         .login-left .features li {
+112:         .login-left .features li::before {
+116:         .login-right {
+123:         .login-right h2 {
+127:         .login-right .subtitle {
+132:         .login-form .form-group { margin-bottom: 1.1rem; }
+133:         .login-form .form-group label {
+140:         .login-form .form-control {
+149:         .login-form .form-control:focus {
+154:         .login-btn {
+167:         .login-btn:hover {
+171:         .login-btn:active { transform: translateY(0); }
+172:         .login-switch {
+178:         .login-switch a {
+184:         .login-switch a:hover { text-decoration: underline; }
+185:         .login-error {
+195:         .register-form { display: none; }
+973:             .login-card {
+983:             .login-left {
+991:             .login-left h1 { font-size: 1.3rem; }
+993:             .login-left .features { display: none; }
+995:             .login-right { padding: 1.5rem; }
+1137:             .login-left { display: none; }
+1139:             .login-right { padding: 1.5rem 1.25rem; }
+1141:             .login-card { border-radius: 16px; }
+1228: <!-- ==================== 登录页 ==================== -->
+1229: <div class="login-page" id="loginPage">
+1230:     <div class="login-card">
+1231:         <div class="login-left">
+1242:         <div class="login-right">
+1243:             <h2 id="authTitle">欢迎登录</h2>
+1246:             <div class="login-error" id="loginError"></div>
+1248:             <!-- 登录表单 -->
+1249:             <div class="login-form" id="loginForm">
+1252:                     <input type="email" id="loginEmail" class="form-control" placeholder="请输入邮箱">
+1257:                         <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码"
+1258:                                onkeydown="if(event.key==='Enter')doLogin()">
+1259:                         <span class="password-toggle" onclick="togglePassword('loginPassword', this)">👁</span>
+1262:                 <button class="login-btn" onclick="doLogin()">登 录</button>
+1263:                 <div class="login-switch">
+1264:                     还没有账号？<a onclick="showRegister()">立即注册</a>
+1268:             <!-- 注册表单 -->
+1269:             <div class="login-form register-form" id="registerForm">
+1286:                         <span class="password-toggle" onclick="togglePassword('regPassword', this)">👁</span>
+1297:                 <button class="login-btn" onclick="doRegister()">注 册</button>
+1298:                 <div class="login-switch">
+1299:                     已有账号？<a onclick="showLogin()">返回登录</a>
+1325:                 <button class="nav-tab active" data-page="calendar" onclick="switchPage('calendar')">📅 预约日历</button>
+1326:                 <button class="nav-tab" data-page="bookings" onclick="switchPage('bookings')">📋 预约记录</button>
+1327:                 <button class="nav-tab" data-page="equipment" onclick="switchPage('equipment')">🔬 设备管理</button>
+1328:                 <button class="nav-tab" data-page="users" onclick="switchPage('users')">👥 用户管理</button>
+1329:                 <button class="nav-tab" data-page="email" onclick="switchPage('email')">📧 邮件设置</button>
+1333:             <div class="user-trigger" onclick="toggleUserMenu()">
+1342:                 <div class="dd-item" onclick="openProfileModal()">👤 个人设置</div>
+1343:                 <div class="dd-item" onclick="openPasswordModal()">🔑 修改密码</div>
+1345:                 <div class="dd-item danger" onclick="doLogout()">🚪 退出登录</div>
+1373:                     <div class="stat-info"><h3 id="statUsers">-</h3><p>注册用户</p></div>
+1378:                     <button class="btn" onclick="changeWeek(-1)">◀ 上一周</button>
+1380:                     <button class="btn" onclick="changeWeek(1)">下一周 ▶</button>
+1381:                     <button class="btn" onclick="goToday()">今天</button>
+1383:                 <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
+1408:                         <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
+1434:                     <button class="btn btn-primary" onclick="openEquipmentModal()">＋ 添加设备</button>
+1501:                             <span class="password-toggle" onclick="togglePassword('smtpPass', this)">👁</span>
+1519:                     <button class="btn btn-primary" onclick="saveEmailConfig()" style="width:100%;justify-content:center;">
+1530:                     <button class="btn btn-primary" onclick="sendTestEmail()" style="width:100%;justify-content:center;">
+1568:             <button class="mobile-nav-item active" data-page="calendar" onclick="switchPage('calendar')">
+1576:             <button class="mobile-nav-item" data-page="bookings" onclick="switchPage('bookings')">
+1584:             <button class="mobile-nav-item" data-page="equipment" onclick="switchPage('equipment')">
+1592:             <button class="mobile-nav-item" data-page="users" onclick="switchPage('users')">
+1600:             <button class="mobile-nav-item" onclick="toggleUserMenu()">
+1619:             <button class="modal-close" onclick="closeModal('bookingModal')">✕</button>
+1653:             <button class="btn" onclick="closeModal('bookingModal')">取消</button>
+1654:             <button class="btn btn-primary" onclick="saveBooking()">确认预约</button>
+1664:             <button class="modal-close" onclick="closeModal('equipmentModal')">✕</button>
+1690:             <button class="btn" onclick="closeModal('equipmentModal')">取消</button>
+1691:             <button class="btn btn-primary" onclick="saveEquipment()">保存</button>
+1701:             <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+1730:             <button class="btn" onclick="closeModal('userModal')">取消</button>
+1731:             <button class="btn btn-primary" onclick="saveUser()">保存</button>
+1741:             <button class="modal-close" onclick="closeModal('profileModal')">✕</button>
+1766:             <button class="btn" onclick="closeModal('profileModal')">取消</button>
+1767:             <button class="btn btn-primary" onclick="saveProfile()">保存</button>
+1777:             <button class="modal-close" onclick="closeModal('passwordModal')">✕</button>
+1784:                     <span class="password-toggle" onclick="togglePassword('oldPassword', this)">👁</span>
+1791:                     <span class="password-toggle" onclick="togglePassword('newPassword', this)">👁</span>
+1798:                     <span class="password-toggle" onclick="togglePassword('confirmPassword', this)">👁</span>
+1803:             <button class="btn" onclick="closeModal('passwordModal')">取消</button>
+1804:             <button class="btn btn-primary" onclick="changePassword()">确认修改</button>
+1903: // ==================== 登录 / 注册 ====================
+1904: function showLogin() {
+1905:     document.getElementById('loginForm').style.display = 'block';
+1906:     document.getElementById('registerForm').style.display = 'none';
+1907:     document.getElementById('authTitle').textContent = '欢迎登录';
+1909:     document.getElementById('loginError').style.display = 'none';
+1912: function showRegister() {
+1913:     document.getElementById('loginForm').style.display = 'none';
+1914:     document.getElementById('registerForm').style.display = 'block';
+1915:     document.getElementById('authTitle').textContent = '注册账号';
+1917:     document.getElementById('loginError').style.display = 'none';
+1920: function showLoginError(msg) {
+1921:     const el = document.getElementById('loginError');
+1926: async function doLogin() {
+1927:     const email = document.getElementById('loginEmail').value.trim();
+1928:     const password = document.getElementById('loginPassword').value;
+1931:         showLoginError('请输入邮箱和密码');
+1935:     const data = await api('/api/auth/login', {
+1946:         showLoginError('邮箱或密码错误');
+1950: async function doRegister() {
+1958:     if (!name) { showLoginError('请输入昵称'); return; }
+1959:     if (!email) { showLoginError('请输入邮箱'); return; }
+1960:     if (!password || password.length < 4) { showLoginError('密码至少4位'); return; }
+1962:     const data = await api('/api/auth/register', {
+1968:         showToast('注册成功，已自动登录！');
+1974:         showLoginError('注册失败，可能邮箱已被注册');
+1984:     document.getElementById('loginPage').style.display = 'flex';
+1986:     document.getElementById('loginEmail').value = '';
+1987:     document.getElementById('loginPassword').value = '';
+1988:     showLogin();
+1993:     document.getElementById('loginPage').style.display = 'none';
+2028: document.addEventListener('click', (e) => {
+2224:             html += `<div class="hour-row" onclick="openBookingModal(null, '${ds}', '${slot}')"></div>`;
+2263:                 onclick="event.stopPropagation(); viewBooking(${b.id})"
+2338:                     <button class="btn btn-sm" onclick="editBooking(${b.id})">编辑</button>
+2339:                     <button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">取消</button>
+2404:     // 用户ID：统一使用当前登录用户
+2471:                 <button class="btn btn-sm" onclick="editEquipment(${e.id})">编辑</button>
+2472:                 <button class="btn btn-sm btn-danger" onclick="deleteEquipment(${e.id})">删除</button>
+2553:                 <button class="btn btn-sm" onclick="editUser(${u.id})">编辑</button>
+2554:                 ${u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">删除</button>` : ''}
+2630:     // 已废弃：预约人统一使用当前登录用户，无需下拉框
+2643:     overlay.addEventListener('click', (e) => {
+2649: document.addEventListener('DOMContentLoaded', () => {
+2650:     // 检查登录状态

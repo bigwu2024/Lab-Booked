@@ -1,0 +1,200 @@
+601|    rows = query_db(conn, 'SELECT * FROM equipment ORDER BY id')
+602|    conn.close()
+603|    return jsonify(rows)
+604|
+605|
+606|@app.route('/api/equipment', methods=['POST'])
+607|def add_equipment():
+608|    """添加新设备"""
+609|    data = request.json
+610|    conn = get_db()
+611|    cur = execute_db(conn,
+612|        'INSERT INTO equipment (name, location, description) VALUES (%s, %s, %s)',
+613|        (data['name'], data.get('location', ''), data.get('description', ''))
+614|    )
+615|    conn.commit()
+616|    equip_id = cur.lastrowid
+617|    cur.close()
+618|    conn.close()
+619|    return jsonify({'id': equip_id, 'message': '设备添加成功'}), 201
+620|
+621|
+622|@app.route('/api/equipment/<int:eid>', methods=['PUT'])
+623|def update_equipment(eid):
+624|    """更新设备信息"""
+625|    data = request.json
+626|    conn = get_db()
+627|    execute_db(conn,
+628|        'UPDATE equipment SET name=%s, location=%s, status=%s, description=%s WHERE id=%s',
+629|        (data['name'], data.get('location', ''), data.get('status', 'available'),
+630|         data.get('description', ''), eid)
+631|    )
+632|    conn.commit()
+633|    conn.close()
+634|    return jsonify({'message': '设备更新成功'})
+635|
+636|
+637|@app.route('/api/equipment/<int:eid>', methods=['DELETE'])
+638|def delete_equipment(eid):
+639|    """删除设备"""
+640|    conn = get_db()
+641|    cur = execute_db(conn,
+642|        "SELECT COUNT(*) as cnt FROM bookings WHERE equipment_id=%s AND status='active'",
+643|        (eid,)
+644|    )
+645|    bookings = cur.fetchone()['cnt']
+646|    cur.close()
+647|    if bookings > 0:
+648|        conn.close()
+649|        return jsonify({'error': '该设备有活跃预约，无法删除'}), 400
+650|    execute_db(conn, 'DELETE FROM equipment WHERE id=%s', (eid,))
+651|    conn.commit()
+652|    conn.close()
+653|    return jsonify({'message': '设备删除成功'})
+654|
+655|
+656|# ==================== 用户 API ====================
+657|
+658|@app.route('/api/users', methods=['GET'])
+659|def get_users():
+660|    """获取所有用户（不返回密码）"""
+661|    conn = get_db()
+662|    rows = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role, created_at FROM users ORDER BY id')
+663|    conn.close()
+664|    return jsonify(rows)
+665|
+666|
+667|@app.route('/api/users/<int:uid>', methods=['PUT'])
+668|def update_user(uid):
+669|    """更新用户信息（管理员）"""
+670|    data = request.json
+671|    conn = get_db()
+672|    execute_db(conn,
+673|        'UPDATE users SET name=%s, real_name=%s, group_name=%s, phone=%s, role=%s WHERE id=%s',
+674|        (data['name'], data.get('real_name', ''), data.get('group_name', ''), data.get('phone', ''),
+675|         data.get('role', 'user'), uid)
+676|    )
+677|    conn.commit()
+678|    conn.close()
+679|    return jsonify({'message': '用户更新成功'})
+680|
+681|
+682|@app.route('/api/users/<int:uid>', methods=['DELETE'])
+683|def delete_user(uid):
+684|    """删除用户"""
+685|    conn = get_db()
+686|    cur = execute_db(conn,
+687|        "SELECT COUNT(*) as cnt FROM bookings WHERE user_id=%s AND status='active'",
+688|        (uid,)
+689|    )
+690|    bookings = cur.fetchone()['cnt']
+691|    cur.close()
+692|    if bookings > 0:
+693|        conn.close()
+694|        return jsonify({'error': '该用户有活跃预约，无法删除'}), 400
+695|    execute_db(conn, "DELETE FROM users WHERE id=%s AND role != 'admin'", (uid,))
+696|    conn.commit()
+697|    conn.close()
+698|    return jsonify({'message': '用户删除成功'})
+699|
+700|
+701|# ==================== 预约 API ====================
+702|
+703|@app.route('/api/bookings', methods=['GET'])
+704|def get_bookings():
+705|    """获取预约列表，支持过滤"""
+706|    equipment_id = request.args.get('equipment_id')
+707|    date_from = request.args.get('date_from')
+708|    date_to = request.args.get('date_to')
+709|    user_id = request.args.get('user_id')
+710|    status = request.args.get('status', 'active')
+711|
+712|    conn = get_db()
+713|    query = '''
+714|        SELECT b.*, e.name as equipment_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.group_name, u.email
+715|        FROM bookings b
+716|        JOIN equipment e ON b.equipment_id = e.id
+717|        JOIN users u ON b.user_id = u.id
+718|        WHERE 1=1
+719|    '''
+720|    params = []
+721|
+722|    if equipment_id:
+723|        query += ' AND b.equipment_id = %s'
+724|        params.append(int(equipment_id))
+725|    if date_from:
+726|        query += ' AND b.date >= %s'
+727|        params.append(date_from)
+728|    if date_to:
+729|        query += ' AND b.date <= %s'
+730|        params.append(date_to)
+731|    if user_id:
+732|        query += ' AND b.user_id = %s'
+733|        params.append(int(user_id))
+734|    if status:
+735|        query += " AND b.status = %s"
+736|        params.append(status)
+737|
+738|    query += ' ORDER BY b.date, b.start_time, b.equipment_id'
+739|    rows = query_db(conn, query, params)
+740|    conn.close()
+741|    return jsonify(rows)
+742|
+743|
+744|@app.route('/api/bookings/week', methods=['GET'])
+745|def get_week_bookings():
+746|    """获取某周的预约数据（用于周视图渲染）"""
+747|    date_str = request.args.get('date')  # YYYY-MM-DD，可以是周内任意一天
+748|    if not date_str:
+749|        date_str = datetime.now().strftime('%Y-%m-%d')
+750|
+751|    target_date = datetime.strptime(date_str, '%Y-%m-%d')
+752|    monday = target_date - timedelta(days=target_date.weekday())
+753|    sunday = monday + timedelta(days=6)
+754|
+755|    conn = get_db()
+756|    rows = query_db(conn, '''
+757|        SELECT b.*, e.name as equipment_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, u.group_name
+758|        FROM bookings b
+759|        JOIN equipment e ON b.equipment_id = e.id
+760|        JOIN users u ON b.user_id = u.id
+761|        WHERE b.date >= %s AND b.date <= %s AND b.status = 'active'
+762|        ORDER BY b.date, b.start_time, b.equipment_id
+763|    ''', (monday.strftime('%Y-%m-%d'), sunday.strftime('%Y-%m-%d')))
+764|    conn.close()
+765|
+766|    return jsonify({
+767|        'week_start': monday.strftime('%Y-%m-%d'),
+768|        'week_end': sunday.strftime('%Y-%m-%d'),
+769|        'bookings': rows
+770|    })
+771|
+772|
+773|@app.route('/api/bookings', methods=['POST'])
+774|def create_booking():
+775|    """创建预约"""
+776|    data = request.json
+777|    conn = get_db()
+778|
+779|    # 冲突检测
+780|    conflict = query_db(conn, '''
+781|        SELECT b.id, e.name as equip_name, COALESCE(NULLIF(u.real_name, ''), u.name) as user_name, b.start_time, b.end_time
+782|        FROM bookings b
+783|        JOIN equipment e ON b.equipment_id = e.id
+784|        JOIN users u ON b.user_id = u.id
+785|        WHERE b.equipment_id = %s
+786|          AND b.date = %s
+787|          AND b.status = 'active'
+788|          AND b.start_time < %s
+789|          AND b.end_time > %s
+790|    ''', (data['equipment_id'], data['date'], data['end_time'], data['start_time']), one=True)
+791|
+792|    if conflict:
+793|        conn.close()
+794|        return jsonify({
+795|            'error': '时间冲突',
+796|            'detail': f"{conflict['equip_name']} 在 {conflict['start_time']}-{conflict['end_time']} 已被 {conflict['user_name']} 预约"
+797|        }), 409
+798|
+799|    # 同一用户同一时间段不能预约多台设备
+800|    same_user_conflict = query_db(conn, '''
