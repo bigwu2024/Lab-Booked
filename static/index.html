@@ -2272,6 +2272,25 @@ async function loadCalendar() {
     }
 
     grid.innerHTML = html;
+
+    // 自动滚动到当天第一个预约的时间位置，没有预约则跳到当前时间/8点
+    const wrapper = grid.closest('.calendar-wrapper');
+    if (wrapper) {
+        let scrollHour = 8; // 默认
+        const now = new Date();
+        const todayStr = formatDate(now);
+        const todayBookings = allBookings.filter(b => b.date === todayStr && b.status === 'active');
+        if (todayBookings.length > 0) {
+            const earliest = Math.min(...todayBookings.map(b => timeToMinutes(b.start_time)));
+            scrollHour = Math.max(0, earliest / 60 - 1);
+        } else {
+            const currentHour = now.getHours();
+            if (currentHour >= 0 && currentHour < 24) scrollHour = Math.max(0, currentHour - 1);
+        }
+        const scrollTop = scrollHour * HOUR_HEIGHT;
+        wrapper.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    }
+
     loadStats();
 }
 
