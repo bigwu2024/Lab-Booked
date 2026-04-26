@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 实验室超净台预约系统 - 后端服务
-Flask + MySQL，提供 RESTful API
+Flask + SQLite/MySQL，提供 RESTful API
 支持用户注册/登录、邮件提醒
-Deploy: mysql+pymysql
+默认 SQLite，有 MYSQL_* 环境变量时自动切换 MySQL
 """
 
 import os
@@ -11,10 +11,9 @@ import re
 import json
 import hashlib
 import secrets
+import sqlite3
 import threading
 import smtplib
-import pymysql
-from pymysql.cursors import DictCursor
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
@@ -49,11 +48,29 @@ MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB
 MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '') or os.environ.get('MARIADB_ROOT_PASSWORD', '') or os.environ.get('DATABASE_PASSWORD', '')
 MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '') or os.environ.get('DATABASE_NAME', '') or 'zeabur'
 
+# 引擎检测：有 MySQL 配置 → MySQL，否则 → SQLite
+DB_ENGINE = 'mysql' if ((MYSQL_HOST and MYSQL_USERNAME) or DATABASE_URL) else 'sqlite'
+SQLITE_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'booking.db')
+
+if DB_ENGINE == 'mysql':
+    import pymysql
+    from pymysql.cursors import DictCursor
+    print(f"[数据库] 使用 MySQL ({MYSQL_HOST})")
+else:
+    print(f"[数据库] 使用 SQLite ({SQLITE_DB_PATH})")
+
 
 # ==================== 数据库工具 ====================
 
+def _adapt_sql(sql):
+    """将 MySQL 风格的 %s 占位符转为 SQLite 的 ?"""
+    if DB_ENGINE == 'sqlite':
+        return sql.replace('%s', '?')
+    return sql
+
+
 def get_db_config():
-    """获取数据库连接配置，优先用 Zeabur 注入变量，其次解析 DATABASE_URL"""
+    """获取 MySQL 连接配置"""
     if MYSQL_HOST and MYSQL_USERNAME:
         return {
             'host': MYSQL_HOST,
@@ -64,8 +81,7 @@ def get_db_config():
             'charset': 'utf8mb4',
         }
     if DATABASE_URL:
-        import re as _re
-        m = _re.match(r'(?:mysql|postgresql|mariadb)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
+        m = re.match(r'(?:mysql|postgresql|mariadb)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
         if m:
             return {
                 'host': m.group(3),
@@ -75,21 +91,37 @@ def get_db_config():
                 'database': m.group(5),
                 'charset': 'utf8mb4',
             }
-    raise ValueError('未配置数据库连接信息（需要 DATABASE_URL 或 MYSQL_*/MARIADB_* 环境变量）')
+    return None
 
 
 def get_db():
-    """获取数据库连接"""
-    params = get_db_config()
-    conn = pymysql.connect(**params, cursorclass=DictCursor)
-    conn.autocommit(False)
-    return conn
+    """获取数据库连接（自动选择 MySQL 或 SQLite）"""
+    if DB_ENGINE == 'mysql':
+        params = get_db_config()
+        conn = pymysql.connect(**params, cursorclass=DictCursor)
+        conn.autocommit(False)
+        return conn
+    else:
+        conn = sqlite3.connect(SQLITE_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        return conn
 
 
 def query_db(conn, sql, params=(), one=False):
     """执行查询并返回字典列表"""
-    with conn.cursor(DictCursor) as cur:
-        cur.execute(sql, params)
+    sql = _adapt_sql(sql)
+    if DB_ENGINE == 'mysql':
+        with conn.cursor(DictCursor) as cur:
+            cur.execute(sql, params)
+            if one:
+                row = cur.fetchone()
+                return dict(row) if row else None
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+    else:
+        cur = conn.execute(sql, params)
         if one:
             row = cur.fetchone()
             return dict(row) if row else None
@@ -99,99 +131,142 @@ def query_db(conn, sql, params=(), one=False):
 
 def execute_db(conn, sql, params=()):
     """执行写操作，返回 cursor"""
-    cur = conn.cursor()
-    cur.execute(sql, params)
-    return cur
+    sql = _adapt_sql(sql)
+    if DB_ENGINE == 'mysql':
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        return cur
+    else:
+        return conn.execute(sql, params)
 
 
 def init_db():
-    """初始化数据库表"""
+    """初始化数据库表（自动适配 MySQL / SQLite）"""
     conn = get_db()
 
-    with conn.cursor() as cur:
-        cur.execute('''
+    if DB_ENGINE == 'mysql':
+        with conn.cursor() as cur:
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS equipment (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    location VARCHAR(255) DEFAULT '',
+                    status VARCHAR(50) DEFAULT 'available',
+                    description TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    real_name VARCHAR(255) DEFAULT '',
+                    email VARCHAR(255) UNIQUE,
+                    password_hash VARCHAR(255) NOT NULL,
+                    group_name VARCHAR(255) DEFAULT '',
+                    phone VARCHAR(50) DEFAULT '',
+                    role VARCHAR(50) DEFAULT 'user',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS bookings (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    equipment_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    date VARCHAR(20) NOT NULL,
+                    start_time VARCHAR(10) NOT NULL,
+                    end_time VARCHAR(10) NOT NULL,
+                    purpose TEXT,
+                    status VARCHAR(50) DEFAULT 'active',
+                    reminder_sent TINYINT DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            ''')
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS email_config (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    smtp_host VARCHAR(255) NOT NULL,
+                    smtp_port INT DEFAULT 465,
+                    smtp_user VARCHAR(255) NOT NULL,
+                    smtp_pass TEXT,
+                    use_ssl TINYINT DEFAULT 1,
+                    sender_name VARCHAR(255) DEFAULT '超净台预约系统',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ''')
+    else:
+        conn.executescript('''
             CREATE TABLE IF NOT EXISTS equipment (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                location VARCHAR(255) DEFAULT '',
-                status VARCHAR(50) DEFAULT 'available',
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                location TEXT DEFAULT '',
+                status TEXT DEFAULT 'available',
                 description TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        cur.execute('''
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            );
             CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                real_name VARCHAR(255) DEFAULT '',
-                email VARCHAR(255) UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
-                group_name VARCHAR(255) DEFAULT '',
-                phone VARCHAR(50) DEFAULT '',
-                role VARCHAR(50) DEFAULT 'user',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        cur.execute('''
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                real_name TEXT DEFAULT '',
+                email TEXT UNIQUE,
+                password_hash TEXT NOT NULL,
+                group_name TEXT DEFAULT '',
+                phone TEXT DEFAULT '',
+                role TEXT DEFAULT 'user',
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            );
             CREATE TABLE IF NOT EXISTS bookings (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                equipment_id INT NOT NULL,
-                user_id INT NOT NULL,
-                date VARCHAR(20) NOT NULL,
-                start_time VARCHAR(10) NOT NULL,
-                end_time VARCHAR(10) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
                 purpose TEXT,
-                status VARCHAR(50) DEFAULT 'active',
-                reminder_sent TINYINT DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'active',
+                reminder_sent INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now','localtime')),
+                updated_at TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (equipment_id) REFERENCES equipment(id),
                 FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        ''')
-
-        cur.execute('''
+            );
             CREATE TABLE IF NOT EXISTS email_config (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                smtp_host VARCHAR(255) NOT NULL,
-                smtp_port INT DEFAULT 465,
-                smtp_user VARCHAR(255) NOT NULL,
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                smtp_host TEXT NOT NULL,
+                smtp_port INTEGER DEFAULT 465,
+                smtp_user TEXT NOT NULL,
                 smtp_pass TEXT,
-                use_ssl TINYINT DEFAULT 1,
-                sender_name VARCHAR(255) DEFAULT '超净台预约系统',
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
+                use_ssl INTEGER DEFAULT 1,
+                sender_name TEXT DEFAULT '超净台预约系统',
+                updated_at TEXT DEFAULT (datetime('now','localtime'))
+            );
         ''')
 
     conn.commit()
 
     # 插入默认设备（如果表为空）
-    with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) as cnt FROM equipment')
-        if cur.fetchone()['cnt'] == 0:
-            for name, loc, desc in [
-                ('超净台 1号', '实验室 A101', '左侧标准超净台'),
-                ('超净台 2号', '实验室 A101', '右侧标准超净台'),
-                ('超净台 3号', '实验室 A102', '生物安全柜'),
-            ]:
-                cur.execute(
-                    'INSERT INTO equipment (name, location, description) VALUES (%s, %s, %s)',
-                    (name, loc, desc)
-                )
-            conn.commit()
+    cnt = query_db(conn, 'SELECT COUNT(*) as cnt FROM equipment', one=True)
+    if cnt['cnt'] == 0:
+        for name, loc, desc in [
+            ('超净台 1号', '实验室 A101', '左侧标准超净台'),
+            ('超净台 2号', '实验室 A101', '右侧标准超净台'),
+            ('超净台 3号', '实验室 A102', '生物安全柜'),
+        ]:
+            execute_db(conn, 'INSERT INTO equipment (name, location, description) VALUES (%s, %s, %s)',
+                       (name, loc, desc))
+        conn.commit()
 
     # 插入默认管理员（如果表为空）
-    with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) as cnt FROM users')
-        if cur.fetchone()['cnt'] == 0:
-            pw_hash = hash_password('admin123')
-            cur.execute(
-                'INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)',
-                ('管理员', 'admin@lab.local', pw_hash, 'admin')
-            )
-            conn.commit()
+    cnt = query_db(conn, 'SELECT COUNT(*) as cnt FROM users', one=True)
+    if cnt['cnt'] == 0:
+        pw_hash = hash_password('admin123')
+        execute_db(conn, 'INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)',
+                   ('管理员', 'admin@lab.local', pw_hash, 'admin'))
+        conn.commit()
 
     conn.close()
 
@@ -436,17 +511,14 @@ def register():
 
     pw_hash = hash_password(password)
     # 第一个注册的用户自动成为管理员
-    with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) as cnt FROM users')
-        count = cur.fetchone()['cnt']
+    count = query_db(conn, 'SELECT COUNT(*) as cnt FROM users', one=True)['cnt']
     role = 'admin' if count == 0 else 'user'
 
-    with conn.cursor() as cur:
-        cur.execute('''
-            INSERT INTO users (name, real_name, email, password_hash, group_name, phone, role)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (name, real_name, email, pw_hash, group_name, phone, role))
-        user_id = cur.lastrowid
+    cur = execute_db(conn, '''
+        INSERT INTO users (name, real_name, email, password_hash, group_name, phone, role)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    ''', (name, real_name, email, pw_hash, group_name, phone, role))
+    user_id = cur.lastrowid
     conn.commit()
 
     user = query_db(conn, 'SELECT id, name, real_name, email, group_name, phone, role FROM users WHERE id = %s', (user_id,), one=True)
@@ -638,12 +710,9 @@ def update_equipment(eid):
 def delete_equipment(eid):
     """删除设备"""
     conn = get_db()
-    cur = execute_db(conn,
+    bookings = query_db(conn,
         "SELECT COUNT(*) as cnt FROM bookings WHERE equipment_id=%s AND status='active'",
-        (eid,)
-    )
-    bookings = cur.fetchone()['cnt']
-    cur.close()
+        (eid,), one=True)['cnt']
     if bookings > 0:
         conn.close()
         return jsonify({'error': '该设备有活跃预约，无法删除'}), 400
@@ -683,12 +752,9 @@ def update_user(uid):
 def delete_user(uid):
     """删除用户"""
     conn = get_db()
-    cur = execute_db(conn,
+    bookings = query_db(conn,
         "SELECT COUNT(*) as cnt FROM bookings WHERE user_id=%s AND status='active'",
-        (uid,)
-    )
-    bookings = cur.fetchone()['cnt']
-    cur.close()
+        (uid,), one=True)['cnt']
     if bookings > 0:
         conn.close()
         return jsonify({'error': '该用户有活跃预约，无法删除'}), 400
@@ -921,27 +987,19 @@ def get_stats():
     """获取预约统计数据"""
     conn = get_db()
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT COUNT(*) as cnt FROM bookings WHERE status='active'")
-        total_bookings = cur.fetchone()['cnt']
+    total_bookings = query_db(conn, "SELECT COUNT(*) as cnt FROM bookings WHERE status='active'", one=True)['cnt']
 
-        today = datetime.now().strftime('%Y-%m-%d')
-        cur.execute("SELECT COUNT(*) as cnt FROM bookings WHERE date=%s AND status='active'", (today,))
-        today_bookings = cur.fetchone()['cnt']
+    today = datetime.now().strftime('%Y-%m-%d')
+    today_bookings = query_db(conn, "SELECT COUNT(*) as cnt FROM bookings WHERE date=%s AND status='active'", (today,), one=True)['cnt']
 
-        cur.execute('SELECT COUNT(*) as cnt FROM equipment')
-        total_equipment = cur.fetchone()['cnt']
-
-        cur.execute('SELECT COUNT(*) as cnt FROM users')
-        total_users = cur.fetchone()['cnt']
+    total_equipment = query_db(conn, 'SELECT COUNT(*) as cnt FROM equipment', one=True)['cnt']
+    total_users = query_db(conn, 'SELECT COUNT(*) as cnt FROM users', one=True)['cnt']
 
     # 近7天每天预约数
     week_stats = []
     for i in range(6, -1, -1):
         d = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) as cnt FROM bookings WHERE date=%s AND status='active'", (d,))
-            count = cur.fetchone()['cnt']
+        count = query_db(conn, "SELECT COUNT(*) as cnt FROM bookings WHERE date=%s AND status='active'", (d,), one=True)['cnt']
         week_stats.append({'date': d, 'count': count})
 
     # 各设备使用率（近7天）
@@ -975,27 +1033,20 @@ def get_stats():
 def debug_db():
     """检查数据库连接和表状态"""
     try:
-        config = get_db_config()
-        conn = pymysql.connect(**config, cursorclass=DictCursor)
-        with conn.cursor() as cur:
-            cur.execute("SHOW TABLES")
-            tables = [list(r.values())[0] for r in cur.fetchall()]
-            result = {'connected': True, 'host': config['host'], 'tables': tables}
+        conn = get_db()
+        result = {'connected': True, 'engine': DB_ENGINE}
 
-            if 'users' in tables:
-                cur.execute("SELECT COUNT(*) as cnt FROM users")
-                result['user_count'] = cur.fetchone()['cnt']
-                cur.execute("SELECT id, name, email, role FROM users LIMIT 5")
-                result['users'] = [dict(r) for r in cur.fetchall()]
+        result['user_count'] = query_db(conn, 'SELECT COUNT(*) as cnt FROM users', one=True)['cnt']
+        result['users'] = query_db(conn, 'SELECT id, name, email, role FROM users LIMIT 5')
+        result['equipment_count'] = query_db(conn, 'SELECT COUNT(*) as cnt FROM equipment', one=True)['cnt']
 
-            if 'equipment' in tables:
-                cur.execute("SELECT COUNT(*) as cnt FROM equipment")
-                result['equipment_count'] = cur.fetchone()['cnt']
+        if DB_ENGINE == 'mysql':
+            result['host'] = MYSQL_HOST
 
         conn.close()
         return jsonify(result)
     except Exception as e:
-        return jsonify({'connected': False, 'error': str(e)})
+        return jsonify({'connected': False, 'engine': DB_ENGINE, 'error': str(e)})
 
 
 # ==================== 前端路由 ====================
@@ -1065,9 +1116,10 @@ if __name__ == '__main__':
     print("  实验室超净台预约系统")
     print("=" * 50)
 
-    # Zeabur 部署支持：使用环境变量 PORT，host=0.0.0.0，生产环境关闭 debug
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+    db_label = f"MySQL ({MYSQL_HOST})" if DB_ENGINE == 'mysql' else "SQLite"
+    print(f"  数据库引擎: {db_label}")
     print(f"  访问地址: http://0.0.0.0:{port}")
     print(f"  默认管理员: admin@lab.local / admin123")
     print(f"  Debug 模式: {'开启' if debug else '关闭'}")
