@@ -41,15 +41,26 @@ def set_csp(response):
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
+
+def _safe_env(key, default=''):
+    """读取环境变量，过滤 Zeabur 未解析的模板字符串（如 ${{xxx}}）"""
+    val = os.environ.get(key, '')
+    if val and ('${{' in val or val.startswith('$')):
+        return default
+    return val or default
+
+
 # Zeabur 数据库环境变量（支持 MySQL / MariaDB）
-MYSQL_HOST = os.environ.get('MYSQL_HOST', '') or os.environ.get('MARIADB_HOST', '') or os.environ.get('DATABASE_HOST', '')
-MYSQL_PORT = os.environ.get('MYSQL_PORT', '') or os.environ.get('MARIADB_PORT', '') or os.environ.get('DATABASE_PORT', '3306')
-MYSQL_USERNAME = os.environ.get('MYSQL_USERNAME', '') or os.environ.get('MARIADB_USERNAME', '') or os.environ.get('MARIADB_ROOT_USER', '') or os.environ.get('DATABASE_USERNAME', '')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '') or os.environ.get('MARIADB_PASSWORD', '') or os.environ.get('MARIADB_ROOT_PASSWORD', '') or os.environ.get('DATABASE_PASSWORD', '')
-MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', '') or os.environ.get('MARIADB_DATABASE', '') or os.environ.get('DATABASE_NAME', '') or 'zeabur'
+MYSQL_HOST = _safe_env('MYSQL_HOST') or _safe_env('MARIADB_HOST') or _safe_env('DATABASE_HOST')
+MYSQL_PORT = _safe_env('MYSQL_PORT') or _safe_env('MARIADB_PORT') or _safe_env('DATABASE_PORT')
+MYSQL_USERNAME = _safe_env('MYSQL_USERNAME') or _safe_env('MARIADB_USERNAME') or _safe_env('MARIADB_ROOT_USER') or _safe_env('DATABASE_USERNAME')
+MYSQL_PASSWORD = _safe_env('MYSQL_PASSWORD') or _safe_env('MARIADB_PASSWORD') or _safe_env('MARIADB_ROOT_PASSWORD') or _safe_env('DATABASE_PASSWORD')
+MYSQL_DATABASE = _safe_env('MYSQL_DATABASE') or _safe_env('MARIADB_DATABASE') or _safe_env('DATABASE_NAME')
 
 # 引擎检测：有 MySQL 配置 → MySQL，否则 → SQLite
-DB_ENGINE = 'mysql' if ((MYSQL_HOST and MYSQL_USERNAME) or DATABASE_URL) else 'sqlite'
+# DATABASE_URL 也要排除模板字符串
+_valid_db_url = DATABASE_URL and '${{' not in DATABASE_URL
+DB_ENGINE = 'mysql' if ((MYSQL_HOST and MYSQL_USERNAME) and not ('${{' in MYSQL_HOST)) or _valid_db_url else 'sqlite'
 SQLITE_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'booking.db')
 
 if DB_ENGINE == 'mysql':
@@ -72,15 +83,19 @@ def _adapt_sql(sql):
 def get_db_config():
     """获取 MySQL 连接配置"""
     if MYSQL_HOST and MYSQL_USERNAME:
+        try:
+            port = int(MYSQL_PORT) if MYSQL_PORT else 3306
+        except (ValueError, TypeError):
+            port = 3306
         return {
             'host': MYSQL_HOST,
-            'port': int(MYSQL_PORT) if MYSQL_PORT else 3306,
+            'port': port,
             'user': MYSQL_USERNAME,
             'password': MYSQL_PASSWORD,
             'database': MYSQL_DATABASE or 'zeabur',
             'charset': 'utf8mb4',
         }
-    if DATABASE_URL:
+    if DATABASE_URL and '${{' not in DATABASE_URL:
         m = re.match(r'(?:mysql|postgresql|mariadb)://([^:]+):([^@]+)@([^:/]+)(?::(\d+))?/(.+)', DATABASE_URL)
         if m:
             return {
