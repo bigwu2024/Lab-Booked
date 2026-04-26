@@ -197,8 +197,8 @@ def init_db():
                     reminder_sent TINYINT DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                    FOREIGN KEY (equipment_id) REFERENCES equipment(id),
-                    FOREIGN KEY (user_id) REFERENCES users(id)
+                    FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             ''')
             cur.execute('''
@@ -246,8 +246,8 @@ def init_db():
                 reminder_sent INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now','localtime')),
                 updated_at TEXT DEFAULT (datetime('now','localtime')),
-                FOREIGN KEY (equipment_id) REFERENCES equipment(id),
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
             CREATE TABLE IF NOT EXISTS email_config (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -723,18 +723,17 @@ def update_equipment(eid):
 
 @app.route('/api/equipment/<int:eid>', methods=['DELETE'])
 def delete_equipment(eid):
-    """删除设备"""
+    """删除设备（关联预约自动级联删除）"""
     conn = get_db()
-    bookings = query_db(conn,
-        "SELECT COUNT(*) as cnt FROM bookings WHERE equipment_id=%s AND status='active'",
-        (eid,), one=True)['cnt']
-    if bookings > 0:
+    try:
+        execute_db(conn, 'DELETE FROM equipment WHERE id=%s', (eid,))
+        conn.commit()
+        return jsonify({'message': '设备删除成功'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': f'删除失败: {str(e)}'}), 500
+    finally:
         conn.close()
-        return jsonify({'error': '该设备有活跃预约，无法删除'}), 400
-    execute_db(conn, 'DELETE FROM equipment WHERE id=%s', (eid,))
-    conn.commit()
-    conn.close()
-    return jsonify({'message': '设备删除成功'})
 
 
 # ==================== 用户 API ====================
@@ -765,18 +764,24 @@ def update_user(uid):
 
 @app.route('/api/users/<int:uid>', methods=['DELETE'])
 def delete_user(uid):
-    """删除用户"""
+    """删除用户（关联预约自动级联删除）"""
     conn = get_db()
-    bookings = query_db(conn,
-        "SELECT COUNT(*) as cnt FROM bookings WHERE user_id=%s AND status='active'",
-        (uid,), one=True)['cnt']
-    if bookings > 0:
+    try:
+        # 不允许删除管理员
+        user = query_db(conn, 'SELECT role FROM users WHERE id=%s', (uid,), one=True)
+        if not user:
+            return jsonify({'error': '用户不存在'}), 404
+        if user['role'] == 'admin':
+            return jsonify({'error': '不能删除管理员账户'}), 403
+        # ON DELETE CASCADE 会自动清理关联预约
+        execute_db(conn, "DELETE FROM users WHERE id=%s", (uid,))
+        conn.commit()
+        return jsonify({'message': '用户删除成功'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': f'删除失败: {str(e)}'}), 500
+    finally:
         conn.close()
-        return jsonify({'error': '该用户有活跃预约，无法删除'}), 400
-    execute_db(conn, "DELETE FROM users WHERE id=%s AND role != 'admin'", (uid,))
-    conn.commit()
-    conn.close()
-    return jsonify({'message': '用户删除成功'})
 
 
 # ==================== 预约 API ====================
