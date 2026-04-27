@@ -844,6 +844,32 @@
 
 
 
+        /* ==================== 视图切换按钮 ==================== */
+        .view-toggle {
+            display: inline-flex;
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 3px;
+            gap: 2px;
+        }
+        .view-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .view-btn:hover { color: var(--text); }
+        .view-btn.active {
+            background: var(--card);
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
         /* ==================== 手机端卡片布局 ==================== */
         .mobile-cards { display: none; }
         .mobile-card {
@@ -884,38 +910,7 @@
         .mobile-card-actions .btn { flex: 1; justify-content: center; }
 
         /* ==================== 手机端日视图导航 ==================== */
-        .mobile-day-nav {
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.6rem 0;
-            background: var(--card);
-            border-radius: var(--radius-sm);
-            margin-bottom: 0.5rem;
-        }
-        .mobile-day-nav button {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            padding: 8px 14px;
-            cursor: pointer;
-            color: var(--primary);
-            border-radius: 8px;
-            min-width: 44px;
-            min-height: 44px;
-        }
-        .mobile-day-nav button:active { background: rgba(79,110,247,0.1); }
-        .mobile-day-nav .mobile-day-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: var(--text);
-        }
-        .mobile-day-nav .mobile-day-title small {
-            display: block;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            font-weight: 400;
-        }
+        /* 已移除 — 改用 calendar-header 内的统一视图切换 */
 
         /* ==================== 移动端底部导航 ==================== */
 
@@ -1203,25 +1198,26 @@
             .mobile-cards { display: block; }
             .table-wrapper table { display: none; }
 
-            /* 手机端日视图导航 */
-            .mobile-day-nav { display: flex; }
-
             /* 日历手机端：固定高度、允许纵向滚动、表头 sticky */
             .calendar-wrapper {
-                max-height: calc(100vh - 280px);
+                max-height: calc(100vh - 260px);
                 overflow-y: auto;
                 overflow-x: hidden;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: thin;
             }
-            .calendar-grid {
-                display: flex;
-                min-width: auto;
+            .calendar-header {
+                padding: 0.75rem;
+                gap: 0.5rem;
             }
+            .calendar-nav { width: 100%; justify-content: space-between; }
+            .calendar-nav h2 { font-size: 0.9rem; min-width: auto; flex: 1; text-align: center; }
+            .calendar-nav .btn { padding: 6px 10px; font-size: 0.8rem; }
+            .view-toggle { order: 1; }
+            .calendar-header .btn-primary { width: 100%; order: -1; }
             .day-col {
                 flex: 1;
                 min-width: 0;
-                border-right: none;
             }
             .day-col-header {
                 position: sticky;
@@ -1510,17 +1506,18 @@
             </div>
             <div class="calendar-header">
                 <div class="calendar-nav">
-                    <button class="btn" onclick="changeWeek(-1)">◀ 上一周</button>
+                    <button class="btn" id="btnPrev" onclick="calendarPrev()">◀</button>
                     <h2 id="weekTitle">-</h2>
-                    <button class="btn" onclick="changeWeek(1)">下一周 ▶</button>
+                    <button class="btn" id="btnNext" onclick="calendarNext()">▶</button>
                     <button class="btn" onclick="goToday()">今天</button>
                 </div>
-                <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
-            </div>
-            <div class="mobile-day-nav" id="mobileDayNav">
-                <button onclick="changeMobileDay(-1)">◀</button>
-                <div class="mobile-day-title" id="mobileDayTitle">-</div>
-                <button onclick="changeMobileDay(1)">▶</button>
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <div class="view-toggle" id="viewToggle">
+                        <button class="view-btn active" data-view="week" onclick="switchView('week')">周视图</button>
+                        <button class="view-btn" data-view="day" onclick="switchView('day')">日视图</button>
+                    </div>
+                    <button class="btn btn-primary" onclick="openBookingModal()">＋ 预约</button>
+                </div>
             </div>
             <div class="calendar-wrapper">
                 <div class="calendar-grid" id="calendarGrid"></div>
@@ -1967,11 +1964,41 @@ function togglePassword(inputId, icon) {
 const API = '';
 let currentUser = null;
 let currentWeekStart = getMonday(new Date());
-let mobileDayDate = new Date(); // 手机端日视图当前日期
+let currentDayDate = new Date(); // 日视图当前日期
+let calendarView = 'week'; // 'week' 或 'day'
 let equipmentList = [];
 let userList = [];
 
 function isMobile() { return window.innerWidth <= 768; }
+
+function switchView(view) {
+    calendarView = view;
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+    });
+    if (view === 'day') {
+        currentDayDate = new Date(); // 切到日视图默认今天
+    }
+    loadCalendar();
+}
+
+function calendarPrev() {
+    if (calendarView === 'day') {
+        currentDayDate.setDate(currentDayDate.getDate() - 1);
+    } else {
+        currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    }
+    loadCalendar();
+}
+
+function calendarNext() {
+    if (calendarView === 'day') {
+        currentDayDate.setDate(currentDayDate.getDate() + 1);
+    } else {
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    }
+    loadCalendar();
+}
 
 // ==================== 工具函数 ====================
 function getMonday(d) {
@@ -2315,6 +2342,7 @@ function changeWeek(offset) {
 
 function goToday() {
     currentWeekStart = getMonday(new Date());
+    currentDayDate = new Date();
     loadCalendar();
 }
 
@@ -2323,27 +2351,33 @@ async function loadCalendar() {
     const data = await api(`/api/bookings/week?date=${dateStr}`);
     if (!data) return;
 
-    const endDate = new Date(currentWeekStart);
-    endDate.setDate(endDate.getDate() + 6);
-    document.getElementById('weekTitle').textContent =
-        `${formatDateChinese(dateStr)} - ${formatDateChinese(formatDate(endDate))}`;
-
     const grid = document.getElementById('calendarGrid');
     const today = formatDate(new Date());
     const START_HOUR = 0, END_HOUR = 24;
     const HOUR_HEIGHT = 60;
     const TOTAL_HOURS = END_HOUR - START_HOUR;
 
-    // 手机端：单日视图
-    if (isMobile()) {
-        renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS);
-        return;
+    // 根据用户选择的视图模式渲染
+    if (calendarView === 'day') {
+        renderDayView(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS);
+    } else {
+        renderWeekView(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS);
     }
 
-    // 桌面端：7天周视图
+    autoScrollCalendar(data, HOUR_HEIGHT);
+    loadStats();
+}
+
+function renderWeekView(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS) {
+    const dateStr = formatDate(currentWeekStart);
+    const endDate = new Date(currentWeekStart);
+    endDate.setDate(endDate.getDate() + 6);
+    document.getElementById('weekTitle').textContent =
+        `${formatDateChinese(dateStr)} - ${formatDateChinese(formatDate(endDate))}`;
+
+    const grid = document.getElementById('calendarGrid');
     let html = '';
 
-    // 时间标签列
     html += '<div class="time-gutter">';
     html += '<div class="time-gutter-header"></div>';
     for (let h = START_HOUR; h < END_HOUR; h++) {
@@ -2351,13 +2385,11 @@ async function loadCalendar() {
     }
     html += '</div>';
 
-    // 7个日期列
     for (let i = 0; i < 7; i++) {
         const d = new Date(currentWeekStart);
         d.setDate(d.getDate() + i);
         const ds = formatDate(d);
         const isToday = ds === today;
-        // 普通用户只看自己的预约
         let dayBookings = data.bookings.filter(b => b.date === ds);
         if (!isAdmin()) {
             dayBookings = dayBookings.filter(b => b.user_id === currentUser.id);
@@ -2368,81 +2400,26 @@ async function loadCalendar() {
             <div class="day-name">${DAY_NAMES[i]}</div>
             <div>${d.getDate()}</div>
         </div>`;
-
         html += `<div class="day-col-body" style="height:${TOTAL_HOURS * HOUR_HEIGHT}px; position:relative;">`;
-
-        // 背景小时行
         for (let h = START_HOUR; h < END_HOUR; h++) {
             const slot = `${String(h).padStart(2, '0')}:00`;
             html += `<div class="hour-row" onclick="openBookingModal(null, '${ds}', '${slot}')"></div>`;
         }
-
-        // 预约块
-        const sorted = [...dayBookings].sort((a, b) =>
-            timeToMinutes(a.start_time) - timeToMinutes(b.start_time) ||
-            timeToMinutes(b.end_time) - timeToMinutes(a.end_time)
-        );
-        const colEnds = [];
-        const colAssign = [];
-        for (const b of sorted) {
-            const bStart = timeToMinutes(b.start_time);
-            const bEnd = timeToMinutes(b.end_time);
-            let col = -1;
-            for (let c = 0; c < colEnds.length; c++) {
-                if (colEnds[c] <= bStart) { col = c; break; }
-            }
-            if (col === -1) { col = colEnds.length; colEnds.push(0); }
-            colEnds[col] = bEnd;
-            colAssign.push(col);
-        }
-        const totalCols = Math.max(colEnds.length, 1);
-
-        for (let bi = 0; bi < sorted.length; bi++) {
-            const b = sorted[bi];
-            const eqIdx = (b.equipment_id - 1) % 5 + 1;
-            const startMin = timeToMinutes(b.start_time) - START_HOUR * 60;
-            const endMin = timeToMinutes(b.end_time) - START_HOUR * 60;
-            const top = startMin * (HOUR_HEIGHT / 60);
-            const height = (endMin - startMin) * (HOUR_HEIGHT / 60);
-            const displayHeight = Math.max(height, 24);
-            const col = colAssign[bi];
-            const gap = totalCols > 1 ? 1 : 2;
-            const innerWidth = 100 - gap * 2;
-            const colWidth = innerWidth / totalCols;
-            const left = gap + col * colWidth;
-
-            html += `<div class="booking-block eq-${eqIdx}"
-                style="top:${top}px; height:${displayHeight}px; position:absolute; left:${left}%; width:${colWidth}%;"
-                onclick="event.stopPropagation(); viewBooking(${b.id})"
-                title="${b.user_name} | ${b.equipment_name} | ${b.start_time}-${b.end_time}">
-                <div class="b-user">${b.user_name} · ${b.equipment_name}</div>
-                <div class="b-time">${b.start_time}-${b.end_time}</div>
-                ${displayHeight > 40 ? `<div class="b-purpose">${b.purpose || ''}</div>` : ''}
-            </div>`;
-        }
-
+        html += renderBookingBlocks(dayBookings, START_HOUR, HOUR_HEIGHT);
         html += '</div></div>';
     }
-
     grid.innerHTML = html;
-
-    // 桌面端自动滚动
-    autoScrollCalendar(data, HOUR_HEIGHT);
-
-    loadStats();
 }
 
-function renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS) {
-    const ds = formatDate(mobileDayDate);
-    const d = mobileDayDate;
-    const dayIdx = (d.getDay() + 6) % 7; // 0=周一
+function renderDayView(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS) {
+    const ds = formatDate(currentDayDate);
+    const d = currentDayDate;
+    const dayIdx = (d.getDay() + 6) % 7;
     const isToday = ds === today;
 
-    // 更新手机端日期导航
-    const mobileTitle = document.getElementById('mobileDayTitle');
-    if (mobileTitle) {
-        mobileTitle.innerHTML = `${formatDateChinese(ds)} <small>${DAY_NAMES[dayIdx]}${isToday ? ' · 今天' : ''}</small>`;
-    }
+    // 更新标题
+    document.getElementById('weekTitle').innerHTML =
+        `${formatDateChinese(ds)} <small style="font-weight:400;color:var(--text-secondary)">${DAY_NAMES[dayIdx]}${isToday ? ' · 今天' : ''}</small>`;
 
     let dayBookings = data.bookings.filter(b => b.date === ds);
     if (!isAdmin()) {
@@ -2452,7 +2429,6 @@ function renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_H
     const grid = document.getElementById('calendarGrid');
     let html = '';
 
-    // 时间标签列
     html += '<div class="time-gutter">';
     html += '<div class="time-gutter-header"></div>';
     for (let h = START_HOUR; h < END_HOUR; h++) {
@@ -2460,22 +2436,21 @@ function renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_H
     }
     html += '</div>';
 
-    // 单个日期列（全宽）
+    // 单日列，全宽
     html += '<div class="day-col">';
-    html += `<div class="day-col-header ${isToday ? 'today' : ''}">
-        <div class="day-name">${DAY_NAMES[dayIdx]}</div>
-        <div>${d.getDate()}日</div>
-    </div>`;
-
+    html += '<div class="day-col-header" style="display:none;"></div>';
     html += `<div class="day-col-body" style="height:${TOTAL_HOURS * HOUR_HEIGHT}px; position:relative;">`;
-
-    // 背景小时行
     for (let h = START_HOUR; h < END_HOUR; h++) {
         const slot = `${String(h).padStart(2, '0')}:00`;
         html += `<div class="hour-row" onclick="openBookingModal(null, '${ds}', '${slot}')"></div>`;
     }
+    html += renderBookingBlocks(dayBookings, START_HOUR, HOUR_HEIGHT);
+    html += '</div></div>';
 
-    // 预约块（复用相同的列分配逻辑）
+    grid.innerHTML = html;
+}
+
+function renderBookingBlocks(dayBookings, START_HOUR, HOUR_HEIGHT) {
     const sorted = [...dayBookings].sort((a, b) =>
         timeToMinutes(a.start_time) - timeToMinutes(b.start_time) ||
         timeToMinutes(b.end_time) - timeToMinutes(a.end_time)
@@ -2494,6 +2469,7 @@ function renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_H
         colAssign.push(col);
     }
     const totalCols = Math.max(colEnds.length, 1);
+    let html = '';
 
     for (let bi = 0; bi < sorted.length; bi++) {
         const b = sorted[bi];
@@ -2518,15 +2494,7 @@ function renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_H
             <div class="b-purpose">${b.purpose || ''}</div>
         </div>`;
     }
-
-    html += '</div></div>';
-
-    grid.innerHTML = html;
-
-    // 自动滚动到预约时间
-    autoScrollCalendar(data, HOUR_HEIGHT);
-
-    loadStats();
+    return html;
 }
 
 function autoScrollCalendar(data, HOUR_HEIGHT) {
@@ -2535,7 +2503,8 @@ function autoScrollCalendar(data, HOUR_HEIGHT) {
     let scrollHour = 7;
     const now = new Date();
     const todayStr = formatDate(now);
-    const targetDate = isMobile() ? formatDate(mobileDayDate) : todayStr;
+    // 日视图滚动到当前日，周视图滚动到今天
+    const targetDate = calendarView === 'day' ? formatDate(currentDayDate) : todayStr;
     const dayBookings = (data.bookings || []).filter(b => b.date === targetDate && b.status === 'active');
     if (dayBookings.length > 0) {
         const earliest = Math.min(...dayBookings.map(b => timeToMinutes(b.start_time)));
@@ -2548,13 +2517,6 @@ function autoScrollCalendar(data, HOUR_HEIGHT) {
     }
     const scrollTop = scrollHour * HOUR_HEIGHT;
     wrapper.scrollTo({ top: scrollTop, behavior: 'smooth' });
-}
-
-function changeMobileDay(offset) {
-    mobileDayDate.setDate(mobileDayDate.getDate() + offset);
-    // 同步周起始日
-    currentWeekStart = getMonday(mobileDayDate);
-    loadCalendar();
 }
 
 function timeToMinutes(t) {
