@@ -980,6 +980,20 @@
 
         }
 
+        /* 底部导航中间预约按钮 */
+        .mobile-nav-item.add-booking {
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            margin-top: -18px;
+            box-shadow: 0 2px 8px rgba(79,110,247,0.4);
+            flex: none;
+        }
+        .mobile-nav-item.add-booking .m-icon { font-size: 1.5rem; line-height: 1; }
+        .mobile-nav-item.add-booking .m-label { display: none; }
+
         .mobile-nav-item.active { color: var(--primary); }
 
         .mobile-nav-item .m-icon { font-size: 1.25rem; line-height: 1; }
@@ -1197,6 +1211,20 @@
             /* 手机端卡片替代表格 */
             .mobile-cards { display: block; }
             .table-wrapper table { display: none; }
+            /* 工具栏手机端：筛选器全宽 */
+            .table-toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 0.75rem;
+            }
+            .table-toolbar > div {
+                flex-wrap: wrap;
+            }
+            .table-toolbar select.form-control {
+                width: 100% !important;
+                min-height: 44px;
+            }
+            .table-toolbar .btn-primary { display: none; }
 
             /* 日历手机端：固定高度、允许纵向滚动、表头 sticky */
             .calendar-wrapper {
@@ -1206,15 +1234,26 @@
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: thin;
             }
+            /* 日历头部手机端：两行布局 */
             .calendar-header {
-                padding: 0.75rem;
-                gap: 0.5rem;
+                flex-wrap: wrap;
+                padding: 0.6rem 0.75rem;
+                gap: 0.4rem;
             }
-            .calendar-nav { width: 100%; justify-content: space-between; }
-            .calendar-nav h2 { font-size: 0.9rem; min-width: auto; flex: 1; text-align: center; }
+            .calendar-nav {
+                width: 100%;
+                justify-content: space-between;
+                order: 0;
+            }
+            .calendar-nav h2 { font-size: 0.85rem; min-width: auto; flex: 1; text-align: center; }
             .calendar-nav .btn { padding: 6px 10px; font-size: 0.8rem; }
-            .view-toggle { order: 1; }
-            .calendar-header .btn-primary { width: 100%; order: -1; }
+            /* 第二行：视图切换 + 预约按钮（手机端隐藏预约按钮，用底部导航） */
+            .calendar-header > div:last-child {
+                width: 100%;
+                justify-content: center;
+                order: 1;
+            }
+            .calendar-header .btn-primary { display: none; }
             .day-col {
                 flex: 1;
                 min-width: 0;
@@ -1513,7 +1552,7 @@
                 </div>
                 <div style="display:flex;gap:0.5rem;align-items:center;">
                     <div class="view-toggle" id="viewToggle">
-                        <button class="view-btn active" data-view="week" onclick="switchView('week')">周视图</button>
+                        <button class="view-btn" data-view="week" onclick="switchView('week')">周视图</button>
                         <button class="view-btn" data-view="day" onclick="switchView('day')">日视图</button>
                     </div>
                     <button class="btn btn-primary" onclick="openBookingModal()">＋ 预约</button>
@@ -1709,7 +1748,7 @@
 
                 <span class="m-icon">📅</span>
 
-                <span class="m-label">预约日历</span>
+                <span class="m-label">日历</span>
 
             </button>
 
@@ -1717,7 +1756,15 @@
 
                 <span class="m-icon">📋</span>
 
-                <span class="m-label">预约记录</span>
+                <span class="m-label">记录</span>
+
+            </button>
+
+            <button class="mobile-nav-item add-booking" onclick="openBookingModal()">
+
+                <span class="m-icon">＋</span>
+
+                <span class="m-label">预约</span>
 
             </button>
 
@@ -1726,14 +1773,6 @@
                 <span class="m-icon">🔬</span>
 
                 <span class="m-label">设备</span>
-
-            </button>
-
-            <button class="mobile-nav-item" data-page="users" onclick="switchPage('users')">
-
-                <span class="m-icon">👥</span>
-
-                <span class="m-label">用户</span>
 
             </button>
 
@@ -1965,7 +2004,7 @@ const API = '';
 let currentUser = null;
 let currentWeekStart = getMonday(new Date());
 let currentDayDate = new Date(); // 日视图当前日期
-let calendarView = 'week'; // 'week' 或 'day'
+let calendarView = window.innerWidth <= 768 ? 'day' : 'week'; // 手机端默认日视图
 let equipmentList = [];
 let userList = [];
 
@@ -2165,6 +2204,11 @@ function doLogout() {
 function enterApp() {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainApp').classList.add('active');
+    // 根据屏幕宽度设置初始视图
+    calendarView = isMobile() ? 'day' : 'week';
+    document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === calendarView);
+    });
     updateUserUI();
     updateNavTabs();
     loadCalendar();
@@ -2959,10 +3003,23 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 // ==================== 初始化 ====================
 let _resizeTimer;
+let _lastIsMobile = isMobile();
 window.addEventListener('resize', () => {
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(() => {
-        if (currentUser) loadCalendar();
+        if (!currentUser) return;
+        const nowMobile = isMobile();
+        // 切换手机/桌面时自动切换视图
+        if (nowMobile !== _lastIsMobile) {
+            _lastIsMobile = nowMobile;
+            if (nowMobile && calendarView === 'week') {
+                calendarView = 'day';
+                document.querySelectorAll('.view-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.view === 'day');
+                });
+            }
+        }
+        loadCalendar();
     }, 300);
 });
 
