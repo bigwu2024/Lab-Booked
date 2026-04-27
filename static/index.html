@@ -984,15 +984,21 @@
         .mobile-nav-item.add-booking {
             background: var(--primary);
             color: white;
-            border-radius: 50%;
-            width: 48px;
-            height: 48px;
-            margin-top: -18px;
+            border-radius: 20px;
+            padding: 6px 12px;
+            margin-top: -6px;
             box-shadow: 0 2px 8px rgba(79,110,247,0.4);
             flex: none;
+            min-width: 56px;
         }
-        .mobile-nav-item.add-booking .m-icon { font-size: 1.5rem; line-height: 1; }
-        .mobile-nav-item.add-booking .m-label { display: none; }
+        .mobile-nav-item.add-booking .m-icon { display: none; }
+        .mobile-nav-item.add-booking .m-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: white;
+            max-width: none;
+        }
 
         .mobile-nav-item.active { color: var(--primary); }
 
@@ -1228,13 +1234,26 @@
             }
             .table-toolbar .btn-primary { display: none; }
 
-            /* 日历手机端：固定高度、允许纵向滚动、表头 sticky */
+            /* 日历手机端：固定高度、允许滚动、表头 sticky */
             .calendar-wrapper {
                 max-height: calc(100vh - 260px);
-                overflow-y: auto;
-                overflow-x: hidden;
+                overflow: auto;
                 -webkit-overflow-scrolling: touch;
                 scrollbar-width: thin;
+            }
+            /* 周视图：7列需要水平滚动 */
+            .calendar-grid.week-view {
+                min-width: fit-content;
+            }
+            .calendar-grid.week-view .day-col {
+                min-width: 48px;
+                flex: none;
+                width: calc((100vw - 60px - 1.5rem) / 7);
+            }
+            /* 日视图：单列全宽 */
+            .calendar-grid.day-view .day-col {
+                flex: 1;
+                min-width: 0;
             }
             /* 日历头部手机端：两行布局 */
             .calendar-header {
@@ -2458,6 +2477,7 @@ function renderWeekView(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HO
         html += renderBookingBlocks(dayBookings, START_HOUR, HOUR_HEIGHT);
         html += '</div></div>';
     }
+    grid.className = 'calendar-grid week-view';
     grid.innerHTML = html;
 }
 
@@ -2497,6 +2517,7 @@ function renderDayView(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOU
     html += renderBookingBlocks(dayBookings, START_HOUR, HOUR_HEIGHT);
     html += '</div></div>';
 
+    grid.className = 'calendar-grid day-view';
     grid.innerHTML = html;
 }
 
