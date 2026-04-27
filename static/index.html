@@ -1797,7 +1797,7 @@
 
             </button>
 
-            <button class="mobile-nav-item" onclick="toggleUserMenu()">
+            <button class="mobile-nav-item menu-more" onclick="toggleUserMenu()" style="display:none">
 
                 <span class="m-icon">⚙️</span>
 
@@ -2249,15 +2249,24 @@ function updateUserUI() {
 }
 
 function updateNavTabs() {
-    const tabs = document.querySelectorAll('#navTabs .nav-tab');
-    tabs.forEach(tab => {
+    const admin = isAdmin();
+    // 桌面端导航
+    document.querySelectorAll('#navTabs .nav-tab').forEach(tab => {
         const page = tab.dataset.page;
-        if (page === 'users' || page === 'equipment') {
-            tab.style.display = isAdmin() ? '' : 'none';
+        if (page === 'users' || page === 'equipment' || page === 'email') {
+            tab.style.display = admin ? '' : 'none';
         }
-        if (page === 'email') {
-            tab.style.display = isAdmin() ? '' : 'none';
+    });
+    // 手机端底部导航
+    document.querySelectorAll('#mobileNav .mobile-nav-item[data-page]').forEach(btn => {
+        const page = btn.dataset.page;
+        if (page === 'equipment' || page === 'users') {
+            btn.style.display = admin ? '' : 'none';
         }
+    });
+    // 非管理员隐藏「更多」按钮
+    document.querySelectorAll('#mobileNav .mobile-nav-item.menu-more').forEach(btn => {
+        btn.style.display = admin ? '' : 'none';
     });
 }
 
