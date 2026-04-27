@@ -844,6 +844,79 @@
 
 
 
+        /* ==================== 手机端卡片布局 ==================== */
+        .mobile-cards { display: none; }
+        .mobile-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .mobile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .mobile-card-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+        .mobile-card-subtitle {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.3rem;
+        }
+        .mobile-card-info {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .mobile-card-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+        .mobile-card-actions .btn { flex: 1; justify-content: center; }
+
+        /* ==================== 手机端日视图导航 ==================== */
+        .mobile-day-nav {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0;
+            background: var(--card);
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem;
+        }
+        .mobile-day-nav button {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            padding: 8px 14px;
+            cursor: pointer;
+            color: var(--primary);
+            border-radius: 8px;
+            min-width: 44px;
+            min-height: 44px;
+        }
+        .mobile-day-nav button:active { background: rgba(79,110,247,0.1); }
+        .mobile-day-nav .mobile-day-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+        .mobile-day-nav .mobile-day-title small {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
         /* ==================== 移动端底部导航 ==================== */
 
         .mobile-nav {
@@ -1126,9 +1199,71 @@
 
             }
 
+            /* 手机端卡片替代表格 */
+            .mobile-cards { display: block; }
+            .table-wrapper table { display: none; }
+
+            /* 手机端日视图导航 */
+            .mobile-day-nav { display: flex; }
+
+            /* 日历手机端：固定高度、允许纵向滚动、表头 sticky */
+            .calendar-wrapper {
+                max-height: calc(100vh - 280px);
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+            }
+            .calendar-grid {
+                display: flex;
+                min-width: auto;
+            }
+            .day-col {
+                flex: 1;
+                min-width: 0;
+                border-right: none;
+            }
+            .day-col-header {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+                background: var(--card);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+            }
+            .time-gutter { width: 42px; }
+            .time-gutter-row { font-size: 0.65rem; padding-right: 4px; }
+            .booking-block { font-size: 0.72rem; padding: 4px 6px; min-height: 36px; }
+            .booking-block .b-user { font-size: 0.72rem; }
+            .booking-block .b-time { font-size: 0.65rem; }
+            .booking-block .b-purpose { display: block; font-size: 0.6rem; }
+
+            /* 触摸目标 ≥44px */
+            .btn { min-height: 44px; }
+            .modal-close { width: 44px; height: 44px; font-size: 1.2rem; }
+            .mobile-nav-item { min-height: 52px; }
+
+            /* 模态框手机端底部弹出 */
+            .modal-overlay.show {
+                align-items: flex-end !important;
+            }
+            .modal-overlay.show .modal {
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: 92vh;
+                border-radius: 16px 16px 0 0;
+                animation: slideUp 0.25s ease;
+            }
+            .modal-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+            /* 防止 iOS 输入框缩放 */
+            .form-control, input, select, textarea {
+                font-size: 16px !important;
+            }
+
+            /* 表格容器允许水平滚动 */
+            .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
         }
-
-
 
         /* --- 手机 (<=480px) --- */
 
@@ -1382,6 +1517,11 @@
                 </div>
                 <button class="btn btn-primary" onclick="openBookingModal()">＋ 新建预约</button>
             </div>
+            <div class="mobile-day-nav" id="mobileDayNav">
+                <button onclick="changeMobileDay(-1)">◀</button>
+                <div class="mobile-day-title" id="mobileDayTitle">-</div>
+                <button onclick="changeMobileDay(1)">▶</button>
+            </div>
             <div class="calendar-wrapper">
                 <div class="calendar-grid" id="calendarGrid"></div>
             </div>
@@ -1423,6 +1563,7 @@
                     </thead>
                     <tbody id="bookingsTableBody"></tbody>
                 </table>
+                <div class="mobile-cards" id="bookingsMobileCards"></div>
             </div>
         </div>
 
@@ -1447,6 +1588,7 @@
                     </thead>
                     <tbody id="equipmentTableBody"></tbody>
                 </table>
+                <div class="mobile-cards" id="equipmentMobileCards"></div>
             </div>
         </div>
 
@@ -1470,6 +1612,7 @@
                     </thead>
                     <tbody id="usersTableBody"></tbody>
                 </table>
+                <div class="mobile-cards" id="usersMobileCards"></div>
             </div>
         </div>
 
@@ -1824,8 +1967,11 @@ function togglePassword(inputId, icon) {
 const API = '';
 let currentUser = null;
 let currentWeekStart = getMonday(new Date());
+let mobileDayDate = new Date(); // 手机端日视图当前日期
 let equipmentList = [];
 let userList = [];
+
+function isMobile() { return window.innerWidth <= 768; }
 
 // ==================== 工具函数 ====================
 function getMonday(d) {
@@ -2188,6 +2334,13 @@ async function loadCalendar() {
     const HOUR_HEIGHT = 60;
     const TOTAL_HOURS = END_HOUR - START_HOUR;
 
+    // 手机端：单日视图
+    if (isMobile()) {
+        renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS);
+        return;
+    }
+
+    // 桌面端：7天周视图
     let html = '';
 
     // 时间标签列
@@ -2273,25 +2426,135 @@ async function loadCalendar() {
 
     grid.innerHTML = html;
 
-    // 自动滚动到当天第一个预约的时间位置，没有预约则跳到当前时间/8点
-    const wrapper = grid.closest('.calendar-wrapper');
-    if (wrapper) {
-        let scrollHour = 8; // 默认
-        const now = new Date();
-        const todayStr = formatDate(now);
-        const todayBookings = allBookings.filter(b => b.date === todayStr && b.status === 'active');
-        if (todayBookings.length > 0) {
-            const earliest = Math.min(...todayBookings.map(b => timeToMinutes(b.start_time)));
-            scrollHour = Math.max(0, earliest / 60 - 1);
-        } else {
-            const currentHour = now.getHours();
-            if (currentHour >= 0 && currentHour < 24) scrollHour = Math.max(0, currentHour - 1);
-        }
-        const scrollTop = scrollHour * HOUR_HEIGHT;
-        wrapper.scrollTo({ top: scrollTop, behavior: 'smooth' });
-    }
+    // 桌面端自动滚动
+    autoScrollCalendar(data, HOUR_HEIGHT);
 
     loadStats();
+}
+
+function renderMobileDay(data, today, START_HOUR, END_HOUR, HOUR_HEIGHT, TOTAL_HOURS) {
+    const ds = formatDate(mobileDayDate);
+    const d = mobileDayDate;
+    const dayIdx = (d.getDay() + 6) % 7; // 0=周一
+    const isToday = ds === today;
+
+    // 更新手机端日期导航
+    const mobileTitle = document.getElementById('mobileDayTitle');
+    if (mobileTitle) {
+        mobileTitle.innerHTML = `${formatDateChinese(ds)} <small>${DAY_NAMES[dayIdx]}${isToday ? ' · 今天' : ''}</small>`;
+    }
+
+    let dayBookings = data.bookings.filter(b => b.date === ds);
+    if (!isAdmin()) {
+        dayBookings = dayBookings.filter(b => b.user_id === currentUser.id);
+    }
+
+    const grid = document.getElementById('calendarGrid');
+    let html = '';
+
+    // 时间标签列
+    html += '<div class="time-gutter">';
+    html += '<div class="time-gutter-header"></div>';
+    for (let h = START_HOUR; h < END_HOUR; h++) {
+        html += `<div class="time-gutter-row">${String(h).padStart(2, '0')}:00</div>`;
+    }
+    html += '</div>';
+
+    // 单个日期列（全宽）
+    html += '<div class="day-col">';
+    html += `<div class="day-col-header ${isToday ? 'today' : ''}">
+        <div class="day-name">${DAY_NAMES[dayIdx]}</div>
+        <div>${d.getDate()}日</div>
+    </div>`;
+
+    html += `<div class="day-col-body" style="height:${TOTAL_HOURS * HOUR_HEIGHT}px; position:relative;">`;
+
+    // 背景小时行
+    for (let h = START_HOUR; h < END_HOUR; h++) {
+        const slot = `${String(h).padStart(2, '0')}:00`;
+        html += `<div class="hour-row" onclick="openBookingModal(null, '${ds}', '${slot}')"></div>`;
+    }
+
+    // 预约块（复用相同的列分配逻辑）
+    const sorted = [...dayBookings].sort((a, b) =>
+        timeToMinutes(a.start_time) - timeToMinutes(b.start_time) ||
+        timeToMinutes(b.end_time) - timeToMinutes(a.end_time)
+    );
+    const colEnds = [];
+    const colAssign = [];
+    for (const b of sorted) {
+        const bStart = timeToMinutes(b.start_time);
+        const bEnd = timeToMinutes(b.end_time);
+        let col = -1;
+        for (let c = 0; c < colEnds.length; c++) {
+            if (colEnds[c] <= bStart) { col = c; break; }
+        }
+        if (col === -1) { col = colEnds.length; colEnds.push(0); }
+        colEnds[col] = bEnd;
+        colAssign.push(col);
+    }
+    const totalCols = Math.max(colEnds.length, 1);
+
+    for (let bi = 0; bi < sorted.length; bi++) {
+        const b = sorted[bi];
+        const eqIdx = (b.equipment_id - 1) % 5 + 1;
+        const startMin = timeToMinutes(b.start_time) - START_HOUR * 60;
+        const endMin = timeToMinutes(b.end_time) - START_HOUR * 60;
+        const top = startMin * (HOUR_HEIGHT / 60);
+        const height = (endMin - startMin) * (HOUR_HEIGHT / 60);
+        const displayHeight = Math.max(height, 28);
+        const col = colAssign[bi];
+        const gap = totalCols > 1 ? 1 : 2;
+        const innerWidth = 100 - gap * 2;
+        const colWidth = innerWidth / totalCols;
+        const left = gap + col * colWidth;
+
+        html += `<div class="booking-block eq-${eqIdx}"
+            style="top:${top}px; height:${displayHeight}px; position:absolute; left:${left}%; width:${colWidth}%;"
+            onclick="event.stopPropagation(); viewBooking(${b.id})"
+            title="${b.user_name} | ${b.equipment_name} | ${b.start_time}-${b.end_time}">
+            <div class="b-user">${b.user_name} · ${b.equipment_name}</div>
+            <div class="b-time">${b.start_time}-${b.end_time}</div>
+            <div class="b-purpose">${b.purpose || ''}</div>
+        </div>`;
+    }
+
+    html += '</div></div>';
+
+    grid.innerHTML = html;
+
+    // 自动滚动到预约时间
+    autoScrollCalendar(data, HOUR_HEIGHT);
+
+    loadStats();
+}
+
+function autoScrollCalendar(data, HOUR_HEIGHT) {
+    const wrapper = document.querySelector('.calendar-wrapper');
+    if (!wrapper) return;
+    let scrollHour = 7;
+    const now = new Date();
+    const todayStr = formatDate(now);
+    const targetDate = isMobile() ? formatDate(mobileDayDate) : todayStr;
+    const dayBookings = (data.bookings || []).filter(b => b.date === targetDate && b.status === 'active');
+    if (dayBookings.length > 0) {
+        const earliest = Math.min(...dayBookings.map(b => timeToMinutes(b.start_time)));
+        scrollHour = Math.max(0, earliest / 60 - 1);
+    } else {
+        const currentHour = now.getHours();
+        if (targetDate === todayStr && currentHour >= 0 && currentHour < 24) {
+            scrollHour = Math.max(0, currentHour - 1);
+        }
+    }
+    const scrollTop = scrollHour * HOUR_HEIGHT;
+    wrapper.scrollTo({ top: scrollTop, behavior: 'smooth' });
+}
+
+function changeMobileDay(offset) {
+    mobileDayDate.setDate(mobileDayDate.getDate() + offset);
+    // 同步周起始日
+    currentWeekStart = getMonday(mobileDayDate);
+    loadCalendar();
 }
 
 function timeToMinutes(t) {
@@ -2338,6 +2601,8 @@ async function loadBookings() {
     const tbody = document.getElementById('bookingsTableBody');
     if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">暂无预约记录</div></td></tr>`;
+        const mobileCards = document.getElementById('bookingsMobileCards');
+        if (mobileCards) mobileCards.innerHTML = '<div class="empty-state" style="padding:2rem;">暂无预约记录</div>';
         return;
     }
 
@@ -2360,6 +2625,31 @@ async function loadBookings() {
             </td>
         </tr>`;
     }).join('');
+
+    // 手机端卡片
+    const mobileCards = document.getElementById('bookingsMobileCards');
+    if (mobileCards) {
+        mobileCards.innerHTML = filtered.map(b => {
+            const isOwner = currentUser && b.user_id === currentUser.id;
+            const canEdit = isAdmin() || isOwner;
+            const statusColor = b.status === 'active' ? 'var(--success)' : 'var(--text-secondary)';
+            return `<div class="mobile-card">
+                <div class="mobile-card-header">
+                    <div class="mobile-card-title">${b.date} · ${b.start_time}-${b.end_time}</div>
+                    <span class="badge badge-${b.status}">${b.status === 'active' ? '活跃' : '已取消'}</span>
+                </div>
+                <div class="mobile-card-subtitle">🔬 ${b.equipment_name}</div>
+                <div class="mobile-card-info">
+                    👤 ${b.user_name}${b.group_name ? ' · 🏠 ' + b.group_name : ''}<br>
+                    ${b.purpose ? '📝 ' + b.purpose : ''}
+                </div>
+                ${b.status === 'active' && canEdit ? `<div class="mobile-card-actions">
+                    <button class="btn btn-sm" onclick="editBooking(${b.id})">编辑</button>
+                    <button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">取消</button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+    }
 }
 
 async function openBookingModal(bookingId = null, preDate = null, preTime = null) {
@@ -2494,6 +2784,26 @@ async function loadEquipment() {
     `).join('');
 
     updateEquipmentFilter();
+
+    // 手机端卡片
+    const mobileCards = document.getElementById('equipmentMobileCards');
+    if (mobileCards) {
+        const statusText = { available: '可用', maintenance: '维护中', offline: '已停用' };
+        mobileCards.innerHTML = data.map(e => `<div class="mobile-card">
+            <div class="mobile-card-header">
+                <div class="mobile-card-title">🔬 ${e.name}</div>
+                <span class="badge badge-${e.status}">${statusText[e.status]}</span>
+            </div>
+            <div class="mobile-card-info">
+                📍 ${e.location || '未设置位置'}<br>
+                ${e.description || ''}
+            </div>
+            <div class="mobile-card-actions">
+                <button class="btn btn-sm" onclick="editEquipment(${e.id})">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteEquipment(${e.id})">删除</button>
+            </div>
+        </div>`).join('');
+    }
 }
 
 function openEquipmentModal(id = null) {
@@ -2574,6 +2884,27 @@ async function loadUsers() {
             </td>
         </tr>
     `).join('');
+
+    // 手机端卡片
+    const mobileCards = document.getElementById('usersMobileCards');
+    if (mobileCards) {
+        mobileCards.innerHTML = data.map(u => `<div class="mobile-card">
+            <div class="mobile-card-header">
+                <div class="mobile-card-title">${u.name}${u.real_name ? ' (' + u.real_name + ')' : ''}</div>
+                <span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-active'}">
+                    ${u.role === 'admin' ? '管理员' : '用户'}
+                </span>
+            </div>
+            <div class="mobile-card-info">
+                📧 ${u.email || '-'}<br>
+                🏠 ${u.group_name || '-'} · 📱 ${u.phone || '-'}
+            </div>
+            <div class="mobile-card-actions">
+                <button class="btn btn-sm" onclick="editUser(${u.id})">编辑</button>
+                ${u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">删除</button>` : ''}
+            </div>
+        </div>`).join('');
+    }
 }
 
 function openUserModal(id = null) {
@@ -2665,6 +2996,14 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 });
 
 // ==================== 初始化 ====================
+let _resizeTimer;
+window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+        if (currentUser) loadCalendar();
+    }, 300);
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     // 检查登录状态
     const saved = localStorage.getItem('currentUser');
