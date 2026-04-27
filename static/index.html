@@ -1054,7 +1054,7 @@
 
             .login-card {
 
-                flex-direction: column;
+                flex-direction: column-reverse;
 
                 max-width: 420px;
 
@@ -1064,13 +1064,15 @@
 
             .login-left {
 
-                padding: 1.5rem;
+                padding: 1.2rem;
 
                 min-height: auto;
 
+                border-radius: 0 0 20px 20px;
+
             }
 
-            .login-left h1 { font-size: 1.3rem; }
+            .login-left h1 { font-size: 1.1rem; }
 
             .login-left .features { display: none; }
 
@@ -1829,7 +1831,11 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn" onclick="closeModal('bookingModal')">取消</button>
+            <div id="bookingQuickActions" style="display:none;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem;width:100%;justify-content:center;">
+                <button class="btn btn-sm" style="color:var(--warning);border-color:var(--warning)" onclick="quickEndEarly()">⏹ 提前结束</button>
+                <button class="btn btn-sm" style="color:var(--success);border-color:var(--success)" onclick="quickExtend()">⏳ 延时</button>
+            </div>
+            <button class="btn" onclick="closeModal('bookingModal')">关闭</button>
             <button class="btn btn-primary" onclick="saveBooking()">确认预约</button>
         </div>
     </div>
@@ -2615,6 +2621,8 @@ async function loadBookings() {
     tbody.innerHTML = filtered.map(b => {
         const isOwner = currentUser && b.user_id === currentUser.id;
         const canEdit = isAdmin() || isOwner;
+        const showEndEarly = canEndEarly(b) && canEdit;
+        const showExtend = canEndEarly(b) && canEdit;
         return `<tr>
             <td>${b.date}</td>
             <td>${b.start_time} - ${b.end_time}</td>
@@ -2626,6 +2634,8 @@ async function loadBookings() {
             <td class="actions">
                 ${b.status === 'active' && canEdit ? `
                     <button class="btn btn-sm" onclick="editBooking(${b.id})">编辑</button>
+                    ${showEndEarly ? `<button class="btn btn-sm" style="color:var(--warning);border-color:var(--warning)" onclick="endBookingEarly(${b.id})">提前结束</button>` : ''}
+                    ${showExtend ? `<button class="btn btn-sm" style="color:var(--success);border-color:var(--success)" onclick="extendBooking(${b.id})">延时</button>` : ''}
                     <button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">取消</button>
                 ` : '<span style="color:#9ca3af">-</span>'}
             </td>
@@ -2638,7 +2648,8 @@ async function loadBookings() {
         mobileCards.innerHTML = filtered.map(b => {
             const isOwner = currentUser && b.user_id === currentUser.id;
             const canEdit = isAdmin() || isOwner;
-            const statusColor = b.status === 'active' ? 'var(--success)' : 'var(--text-secondary)';
+            const showEndEarly = canEndEarly(b) && canEdit;
+            const showExtend = canEndEarly(b) && canEdit;
             return `<div class="mobile-card">
                 <div class="mobile-card-header">
                     <div class="mobile-card-title">${b.date} · ${b.start_time}-${b.end_time}</div>
@@ -2651,6 +2662,8 @@ async function loadBookings() {
                 </div>
                 ${b.status === 'active' && canEdit ? `<div class="mobile-card-actions">
                     <button class="btn btn-sm" onclick="editBooking(${b.id})">编辑</button>
+                    ${showEndEarly ? `<button class="btn btn-sm" style="color:var(--warning);border-color:var(--warning)" onclick="endBookingEarly(${b.id})">提前结束</button>` : ''}
+                    ${showExtend ? `<button class="btn btn-sm" style="color:var(--success);border-color:var(--success)" onclick="extendBooking(${b.id})">延时</button>` : ''}
                     <button class="btn btn-sm btn-danger" onclick="cancelBooking(${b.id})">取消</button>
                 </div>` : ''}
             </div>`;
@@ -2682,24 +2695,33 @@ async function openBookingModal(bookingId = null, preDate = null, preTime = null
     document.getElementById('bookingModal').classList.add('show');
 }
 
+let _currentViewBookingId = null;
+
 async function viewBooking(id) {
     const all = await api('/api/bookings');
     if (!all) return;
     const b = all.find(x => x.id === id);
     if (!b) return;
 
-    // 权限检查：普通用户只能编辑自己的
     if (!isAdmin() && b.user_id !== currentUser.id) {
         showToast('只能查看自己的预约', 'warning');
         return;
     }
 
+    _currentViewBookingId = id;
     await openBookingModal(id);
     document.getElementById('bookingDate').value = b.date;
     document.getElementById('bookingStart').value = b.start_time;
     document.getElementById('bookingEnd').value = b.end_time;
     document.getElementById('bookingPurpose').value = b.purpose || '';
     document.getElementById('bookingEquipment').value = b.equipment_id;
+
+    // 显示/隐藏提前结束、延时按钮
+    const qa = document.getElementById('bookingQuickActions');
+    if (qa) {
+        const canEdit = isAdmin() || (currentUser && b.user_id === currentUser.id);
+        qa.style.display = (canEndEarly(b) && canEdit) ? 'flex' : 'none';
+    }
 }
 
 async function editBooking(id) {
@@ -2751,6 +2773,58 @@ async function cancelBooking(id) {
         loadCalendar();
         loadBookings();
     }
+}
+
+async function endBookingEarly(id) {
+    if (!confirm('确定提前结束预约？结束时间将截止到当前时间。')) return;
+    const result = await api(`/api/bookings/${id}/end-early`, { method: 'PUT', body: {} });
+    if (result) {
+        showToast(result.message);
+        loadCalendar();
+        loadBookings();
+    }
+}
+
+async function extendBooking(id) {
+    const options = [30, 60, 90, 120];
+    const choice = prompt('请输入延时分钟数（如 30、60、90、120）：', '60');
+    if (!choice) return;
+    const minutes = parseInt(choice);
+    if (isNaN(minutes) || minutes <= 0) {
+        showToast('请输入有效的分钟数', 'warning');
+        return;
+    }
+    const result = await api(`/api/bookings/${id}/extend`, { method: 'PUT', body: { minutes } });
+    if (result) {
+        showToast(result.message);
+        loadCalendar();
+        loadBookings();
+    }
+}
+
+function canEndEarly(b) {
+    if (b.status !== 'active') return false;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    if (b.date !== today) return false;
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const [sh, sm] = b.start_time.split(':').map(Number);
+    const [eh, em] = b.end_time.split(':').map(Number);
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    return nowMin >= startMin && nowMin < endMin;
+}
+
+async function quickEndEarly() {
+    if (!_currentViewBookingId) return;
+    await endBookingEarly(_currentViewBookingId);
+    closeModal('bookingModal');
+}
+
+async function quickExtend() {
+    if (!_currentViewBookingId) return;
+    await extendBooking(_currentViewBookingId);
+    closeModal('bookingModal');
 }
 
 // ==================== 设备 CRUD ====================

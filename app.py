@@ -1000,6 +1000,90 @@ def cancel_booking(bid):
     return jsonify({'message': '预约已取消'})
 
 
+@app.route('/api/bookings/<int:bid>/end-early', methods=['PUT'])
+def end_booking_early(bid):
+    """提前结束预约：将 end_time 设为当前时间"""
+    conn = get_db()
+    now = datetime.now()
+    current_time = now.strftime('%H:%M')
+    current_date = now.strftime('%Y-%m-%d')
+
+    booking = query_db(conn, 'SELECT * FROM bookings WHERE id=%s AND status=%s', (bid, 'active'), one=True)
+    if not booking:
+        conn.close()
+        return jsonify({'error': '预约不存在或已结束'}), 404
+
+    # 只能结束今天且正在进行中的预约
+    if booking['date'] != current_date:
+        conn.close()
+        return jsonify({'error': '只能提前结束今天的预约'}), 400
+
+    if current_time <= booking['start_time']:
+        conn.close()
+        return jsonify({'error': '预约尚未开始'}), 400
+
+    execute_db(conn, '''
+        UPDATE bookings SET end_time=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s
+    ''', (current_time, bid))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': f'已提前结束，截止时间 {current_time}', 'end_time': current_time})
+
+
+@app.route('/api/bookings/<int:bid>/extend', methods=['PUT'])
+def extend_booking(bid):
+    """延时预约：延长 end_time"""
+    data = request.get_json() or {}
+    extra_minutes = data.get('minutes', 60)  # 默认延时1小时
+
+    conn = get_db()
+    now = datetime.now()
+    current_time = now.strftime('%H:%M')
+    current_date = now.strftime('%Y-%m-%d')
+
+    booking = query_db(conn, 'SELECT * FROM bookings WHERE id=%s AND status=%s', (bid, 'active'), one=True)
+    if not booking:
+        conn.close()
+        return jsonify({'error': '预约不存在或已结束'}), 404
+
+    if booking['date'] != current_date:
+        conn.close()
+        return jsonify({'error': '只能延长今天的预约'}), 400
+
+    # 计算新的结束时间
+    end_h, end_m = map(int, booking['end_time'].split(':'))
+    new_end_min = end_h * 60 + end_m + extra_minutes
+    new_h = min(new_end_min // 60, 23)
+    new_m = new_end_min % 60
+    new_end_time = f'{new_h:02d}:{new_m:02d}'
+
+    # 检查时间冲突（排除自身）
+    conflict = query_db(conn, '''
+        SELECT b.id, e.name as equip_name,
+               COALESCE(NULLIF(u.real_name, ''), u.name) as user_name,
+               b.start_time, b.end_time
+        FROM bookings b
+        JOIN users u ON b.user_id = u.id
+        JOIN equipment e ON b.equipment_id = e.id
+        WHERE b.equipment_id = %s AND b.date = %s AND b.status = 'active'
+          AND b.id != %s AND b.start_time < %s AND b.end_time > %s
+        LIMIT 1
+    ''', (booking['equipment_id'], current_date, bid, new_end_time, booking['end_time']), one=True)
+
+    if conflict:
+        conn.close()
+        return jsonify({
+            'error': f"延时冲突：{conflict['equip_name']} 在 {conflict['start_time']}-{conflict['end_time']} 已被 {conflict['user_name']} 预约"
+        }), 409
+
+    execute_db(conn, '''
+        UPDATE bookings SET end_time=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s
+    ''', (new_end_time, bid))
+    conn.commit()
+    conn.close()
+    return jsonify({'message': f'已延时至 {new_end_time}', 'end_time': new_end_time})
+
+
 # ==================== 统计 API ====================
 
 @app.route('/api/stats', methods=['GET'])
